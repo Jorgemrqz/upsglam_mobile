@@ -22,6 +22,7 @@ class UPSGlamBackground extends StatelessWidget {
     final base = UPSGlamTheme.background;
     final primary = UPSGlamTheme.primary;
     final accent = UPSGlamTheme.accent;
+    final gradientPalette = UPSGlamTheme.backgroundGradient;
     final effectivePadding = EdgeInsets.fromLTRB(
       padding.left,
       padding.top + (reserveAppBar ? kToolbarHeight + reserveAppBarSpacing : 0),
@@ -29,16 +30,20 @@ class UPSGlamBackground extends StatelessWidget {
       padding.bottom,
     );
 
+    final gradientColors = gradientPalette.isNotEmpty
+        ? gradientPalette
+        : [
+            base,
+            Color.lerp(base, primary, 0.35)!,
+            Color.lerp(base, accent, 0.2)!,
+          ];
+
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            base,
-            Color.lerp(base, primary, 0.35)!,
-            Color.lerp(base, accent, 0.2)!,
-          ],
+          colors: gradientColors,
         ),
       ),
       child: Stack(

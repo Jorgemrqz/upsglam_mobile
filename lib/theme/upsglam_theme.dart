@@ -18,6 +18,11 @@ class UPSGlamTheme {
       accent: Color(0xFF52F5C2),
       background: Color(0xFF04050C),
       surface: Color(0xFF12142A),
+      backgroundGradient: [
+        Color(0xFF05050D),
+        Color(0xFF0C1024),
+        Color(0xFF1E0F3F),
+      ],
     ),
     UPSGlamPalette.ups: const _PaletteColors(
       label: 'UPS Institucional',
@@ -25,6 +30,11 @@ class UPSGlamTheme {
       accent: Color(0xFFF2C54B),
       background: Color(0xFF020A1A),
       surface: Color(0xFF0F1B38),
+      backgroundGradient: [
+        Color(0xFF010915),
+        Color(0xFF07224A),
+        Color(0xFF0B3A75),
+      ],
     ),
   };
 
@@ -32,6 +42,7 @@ class UPSGlamTheme {
   static Color get accent => _palettes[currentPalette]!.accent;
   static Color get background => _palettes[currentPalette]!.background;
   static Color get surface => _palettes[currentPalette]!.surface;
+  static List<Color> get backgroundGradient => _palettes[currentPalette]!.backgroundGradient;
 
   static void setPalette(UPSGlamPalette palette) {
     if (paletteNotifier.value == palette) return;
@@ -134,6 +145,7 @@ class _PaletteColors {
     required this.accent,
     required this.background,
     required this.surface,
+    required this.backgroundGradient,
   });
 
   final String label;
@@ -141,4 +153,5 @@ class _PaletteColors {
   final Color accent;
   final Color background;
   final Color surface;
+  final List<Color> backgroundGradient;
 }
