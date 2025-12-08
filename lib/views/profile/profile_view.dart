@@ -34,37 +34,56 @@ class ProfileView extends StatelessWidget {
         child: Column(
           children: [
             GlassPanel(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
               child: Column(
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const CircleAvatar(radius: 40, child: Icon(Icons.person)),
-                      const SizedBox(width: 18),
+                      const CircleAvatar(radius: 32, child: Icon(Icons.person)),
+                      const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Estudiante UPS',
-                                style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 4),
-                            Text('Dev paralelo · Quito',
-                                style: textTheme.bodySmall?.copyWith(color: Colors.white70)),
+                            Text(
+                              'Estudiante UPS',
+                              style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Dev paralelo · Quito',
+                              style: textTheme.bodySmall?.copyWith(color: Colors.white70),
+                            ),
                           ],
                         ),
                       ),
-                      Chip(
-                        avatar: const Icon(Icons.auto_awesome, size: 16),
-                        label: Text('GPU Tier', style: textTheme.labelMedium),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: primary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: primary.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.auto_awesome, size: 14, color: accent),
+                            const SizedBox(width: 6),
+                            Text('GPU Tier', style: textTheme.labelMedium),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 14),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: const [
-                      _ProfileStat(label: 'Posts', value: '24'),
-                      _ProfileStat(label: 'Seguidores', value: '312'),
-                      _ProfileStat(label: 'Siguiendo', value: '180'),
+                      Expanded(child: _ProfileStat(label: 'Posts', value: '24')),
+                      SizedBox(width: 12),
+                      Expanded(child: _ProfileStat(label: 'Seguidores', value: '312')),
+                      SizedBox(width: 12),
+                      Expanded(child: _ProfileStat(label: 'Siguiendo', value: '180')),
                     ],
                   ),
                 ],
@@ -76,9 +95,10 @@ class ProfileView extends StatelessWidget {
                 padding: const EdgeInsets.all(12),
                 child: GridView.builder(
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    childAspectRatio: 0.9,
                   ),
                   itemBuilder: (context, index) => Container(
                     decoration: BoxDecoration(
@@ -124,9 +144,13 @@ class _ProfileStat extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(value, style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-        Text(label, style: textTheme.bodySmall?.copyWith(color: Colors.white70)),
+        Text(
+          value,
+          style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        Text(label, style: textTheme.bodySmall?.copyWith(color: Colors.white60)),
       ],
     );
   }
