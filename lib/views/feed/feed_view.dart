@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:upsglam_mobile/theme/upsglam_theme.dart';
 import 'package:upsglam_mobile/views/create_post/select_image_view.dart';
 import 'package:upsglam_mobile/views/feed/comments_view.dart';
 import 'package:upsglam_mobile/views/profile/profile_view.dart';
@@ -14,6 +15,8 @@ class FeedView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final primary = UPSGlamTheme.primary;
+    final accent = UPSGlamTheme.accent;
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
@@ -24,7 +27,7 @@ class FeedView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'UPSGlam Feed',
+                'UPSGlam',
                 style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
               Text(
@@ -63,10 +66,10 @@ class FeedView extends StatelessWidget {
                   children: [
                     Container(
                       padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: LinearGradient(
-                          colors: [Color(0xFF5FF2C7), Color(0xFF8C6CFF)],
+                          colors: [accent, primary],
                         ),
                       ),
                       child: CircleAvatar(
@@ -120,11 +123,14 @@ class FeedView extends StatelessWidget {
                         borderRadius: BorderRadius.circular(22),
                         child: Container(
                           height: 220,
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
-                              colors: [Color(0xFF211F48), Color(0xFF6F3CFF)],
+                              colors: [
+                                primary.withValues(alpha: 0.75),
+                                accent.withValues(alpha: 0.7),
+                              ],
                             ),
                           ),
                           child: const Center(

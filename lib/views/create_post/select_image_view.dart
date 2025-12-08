@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:upsglam_mobile/theme/upsglam_theme.dart';
 import 'package:upsglam_mobile/views/create_post/filter_selection_view.dart';
 import 'package:upsglam_mobile/widgets/glass_panel.dart';
 import 'package:upsglam_mobile/widgets/upsglam_background.dart';
@@ -11,6 +12,8 @@ class SelectImageView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final primary = UPSGlamTheme.primary;
+    final accent = UPSGlamTheme.accent;
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
@@ -38,8 +41,8 @@ class SelectImageView extends StatelessWidget {
                             child: DecoratedBox(
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(26),
-                                gradient: const LinearGradient(
-                                  colors: [Color(0xFF1E1B43), Color(0xFF7044FF)],
+                                gradient: LinearGradient(
+                                  colors: [primary.withValues(alpha: 0.65), accent],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ),

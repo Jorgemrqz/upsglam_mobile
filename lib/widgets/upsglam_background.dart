@@ -19,6 +19,9 @@ class UPSGlamBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final base = UPSGlamTheme.background;
+    final primary = UPSGlamTheme.primary;
+    final accent = UPSGlamTheme.accent;
     final effectivePadding = EdgeInsets.fromLTRB(
       padding.left,
       padding.top + (reserveAppBar ? kToolbarHeight + reserveAppBarSpacing : 0),
@@ -27,11 +30,15 @@ class UPSGlamBackground extends StatelessWidget {
     );
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF05050D), Color(0xFF0C1024), Color(0xFF1E0F3F)],
+          colors: [
+            base,
+            Color.lerp(base, primary, 0.35)!,
+            Color.lerp(base, accent, 0.2)!,
+          ],
         ),
       ),
       child: Stack(
@@ -41,7 +48,7 @@ class UPSGlamBackground extends StatelessWidget {
             right: -30,
             child: _GlowCircle(
               size: 220,
-              colors: [UPSGlamTheme.accent.withValues(alpha: 0.35), Colors.transparent],
+              colors: [accent.withValues(alpha: 0.35), Colors.transparent],
             ),
           ),
           Positioned(
@@ -49,7 +56,7 @@ class UPSGlamBackground extends StatelessWidget {
             left: -20,
             child: _GlowCircle(
               size: 260,
-              colors: [UPSGlamTheme.primary.withValues(alpha: 0.4), Colors.transparent],
+              colors: [primary.withValues(alpha: 0.4), Colors.transparent],
             ),
           ),
           Positioned.fill(

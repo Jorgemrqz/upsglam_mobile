@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:upsglam_mobile/theme/upsglam_theme.dart';
 import 'package:upsglam_mobile/views/auth/login_view.dart';
 import 'package:upsglam_mobile/views/profile/edit_profile_view.dart';
 import 'package:upsglam_mobile/widgets/glass_panel.dart';
@@ -12,6 +13,8 @@ class ProfileView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final primary = UPSGlamTheme.primary;
+    final accent = UPSGlamTheme.accent;
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
@@ -80,10 +83,10 @@ class ProfileView extends StatelessWidget {
                   itemBuilder: (context, index) => Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
-                      gradient: const LinearGradient(
+                      gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [Color(0xFF1B183B), Color(0xFF7B54FF)],
+                        colors: [primary.withValues(alpha: 0.7), accent],
                       ),
                     ),
                     child: Center(

@@ -12,12 +12,17 @@ class UPSGlamApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'UPSGlam 2.0',
-      debugShowCheckedModeBanner: false,
-      theme: UPSGlamTheme.build(),
-      initialRoute: SplashScreen.routeName,
-      onGenerateRoute: AppRouter.onGenerateRoute,
+    return ValueListenableBuilder<UPSGlamPalette>(
+      valueListenable: UPSGlamTheme.paletteNotifier,
+      builder: (context, palette, _) {
+        return MaterialApp(
+          title: 'UPSGlam 2.0',
+          debugShowCheckedModeBanner: false,
+          theme: UPSGlamTheme.build(palette: palette),
+          initialRoute: SplashScreen.routeName,
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        );
+      },
     );
   }
 }

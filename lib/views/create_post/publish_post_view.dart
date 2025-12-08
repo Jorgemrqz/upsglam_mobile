@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:upsglam_mobile/theme/upsglam_theme.dart';
 import 'package:upsglam_mobile/views/feed/feed_view.dart';
 import 'package:upsglam_mobile/widgets/glass_panel.dart';
 import 'package:upsglam_mobile/widgets/upsglam_background.dart';
@@ -11,6 +12,8 @@ class PublishPostView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final primary = UPSGlamTheme.primary;
+    final accent = UPSGlamTheme.accent;
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
@@ -36,9 +39,9 @@ class PublishPostView extends StatelessWidget {
                             borderRadius: BorderRadius.circular(24),
                             child: Container(
                               height: 240,
-                              decoration: const BoxDecoration(
+                              decoration: BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: [Color(0xFF141434), Color(0xFF7D41FF)],
+                                  colors: [primary.withValues(alpha: 0.75), accent],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ),
