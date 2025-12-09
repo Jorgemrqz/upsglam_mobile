@@ -12,7 +12,7 @@ class FilterSelectionView extends StatelessWidget {
     'Sobel',
     'Laplacian',
     'Gaussian',
-    'Sharpen',
+    'Emboss',
     'UPS Logo',
     'Creativo Libre',
   ];
