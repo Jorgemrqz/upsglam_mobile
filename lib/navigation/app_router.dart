@@ -10,6 +10,7 @@ import 'package:upsglam_mobile/views/feed/feed_view.dart';
 import 'package:upsglam_mobile/views/profile/edit_profile_view.dart';
 import 'package:upsglam_mobile/views/profile/profile_view.dart';
 import 'package:upsglam_mobile/views/settings/settings_view.dart';
+import 'package:upsglam_mobile/views/setup/gateway_setup_view.dart';
 
 class AppRouter {
   const AppRouter._();
@@ -38,6 +39,8 @@ class AppRouter {
         return _material(const EditProfileView());
       case SettingsView.routeName:
         return _material(const SettingsView());
+      case GatewaySetupView.routeName:
+        return _material(const GatewaySetupView());
       default:
         return _material(const SplashScreen());
     }

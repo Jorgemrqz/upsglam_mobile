@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:upsglam_mobile/config/api_config.dart';
 import 'package:upsglam_mobile/navigation/app_router.dart';
 import 'package:upsglam_mobile/theme/upsglam_theme.dart';
 import 'package:upsglam_mobile/views/auth/splash_screen.dart';
+import 'package:upsglam_mobile/views/setup/gateway_setup_view.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await ApiConfig.ensureInitialized();
   runApp(const UPSGlamApp());
 }
 
@@ -19,7 +23,9 @@ class UPSGlamApp extends StatelessWidget {
           title: 'UPSGlam 2.0',
           debugShowCheckedModeBanner: false,
           theme: UPSGlamTheme.build(palette: palette),
-          initialRoute: SplashScreen.routeName,
+          initialRoute: ApiConfig.hasGatewayConfigured
+              ? SplashScreen.routeName
+              : GatewaySetupView.routeName,
           onGenerateRoute: AppRouter.onGenerateRoute,
         );
       },

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:upsglam_mobile/config/api_config.dart';
+import 'package:upsglam_mobile/services/auth_service.dart';
 import 'package:upsglam_mobile/views/auth/login_view.dart';
 import 'package:upsglam_mobile/views/feed/feed_view.dart';
+import 'package:upsglam_mobile/views/setup/gateway_setup_view.dart';
 import 'package:upsglam_mobile/widgets/glass_panel.dart';
 import 'package:upsglam_mobile/widgets/upsglam_background.dart';
 
@@ -14,6 +17,9 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  final AuthService _authService = AuthService.instance;
+  String _statusMessage = 'Inicializando paralelismo...';
+
   @override
   void initState() {
     super.initState();
@@ -21,18 +27,39 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _bootstrap() async {
-    await Future<void>.delayed(const Duration(seconds: 2));
-    final bool isAuthenticated = await _fakeSessionCheck();
+    bool isAuthenticated = false;
+    if (!mounted) return;
+    setState(() {
+      _statusMessage = 'Sincronizando con API Gateway...';
+    });
+
+    try {
+      await ApiConfig.ensureInitialized();
+      if (!ApiConfig.hasGatewayConfigured) {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, GatewaySetupView.routeName);
+        return;
+      }
+      isAuthenticated = await _authService.hasValidSession();
+      if (!mounted) return;
+      setState(() {
+        _statusMessage = isAuthenticated
+            ? 'Sesión verificada, cargando feed'
+            : 'Sesión no encontrada, redirigiendo a login';
+      });
+    } on AuthException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _statusMessage = error.message;
+      });
+    }
+
+    await Future<void>.delayed(const Duration(milliseconds: 800));
     if (!mounted) return;
     Navigator.pushReplacementNamed(
       context,
       isAuthenticated ? FeedView.routeName : LoginView.routeName,
     );
-  }
-
-  Future<bool> _fakeSessionCheck() async {
-    // TODO: reemplazar con consulta real al backend/Firebase
-    return false;
   }
 
   @override
@@ -82,17 +109,21 @@ class _SplashScreenState extends State<SplashScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 42, vertical: 20),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          SizedBox(
+                        children: [
+                          const SizedBox(
                             width: 28,
                             height: 28,
                             child: CircularProgressIndicator(strokeWidth: 3),
                           ),
-                          SizedBox(width: 16),
+                          const SizedBox(width: 16),
                           Expanded(
-                            child: Text(
-                              'Inicializando paralelismo...',
-                              overflow: TextOverflow.ellipsis,
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 450),
+                              child: Text(
+                                _statusMessage,
+                                key: ValueKey(_statusMessage),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ),
                         ],

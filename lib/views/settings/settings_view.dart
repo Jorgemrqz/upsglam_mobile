@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:upsglam_mobile/config/api_config.dart';
 import 'package:upsglam_mobile/theme/upsglam_theme.dart';
+import 'package:upsglam_mobile/views/setup/gateway_setup_view.dart';
 import 'package:upsglam_mobile/widgets/glass_panel.dart';
 import 'package:upsglam_mobile/widgets/upsglam_background.dart';
 
@@ -28,28 +30,40 @@ class SettingsView extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     GlassPanel(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                  Text('Backend WebFlux', style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    initialValue: 'https://backend-webflux.dev/api',
-                    decoration: const InputDecoration(
-                      labelText: 'URL base',
-                      helperText: 'Configura el gateway reactivo para auth/posts',
-                      prefixIcon: Icon(Icons.link_outlined),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    initialValue: 'api-key-paralela',
-                    decoration: const InputDecoration(
-                      labelText: 'API Token opcional',
-                      prefixIcon: Icon(Icons.vpn_key_outlined),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+                      child: FutureBuilder<void>(
+                        future: ApiConfig.ensureInitialized(),
+                        builder: (context, snapshot) {
+                          final String gatewayUrl =
+                              ApiConfig.currentGatewayBaseUrl ?? 'No configurado';
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Backend WebFlux',
+                                style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(height: 12),
+                              ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: const Icon(Icons.link_outlined),
+                                title: const Text('URL del API Gateway'),
+                                subtitle: Text(gatewayUrl),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Toca "Actualizar URL" para cambiar la dirección del backend. Se cerrará la sesión actual.',
+                                style: textTheme.bodySmall?.copyWith(color: Colors.white70),
+                              ),
+                              const SizedBox(height: 12),
+                              FilledButton.icon(
+                                onPressed: () => Navigator.pushNamed(
+                                  context,
+                                  GatewaySetupView.routeName,
+                                ),
+                                icon: const Icon(Icons.edit_outlined),
+                                label: const Text('Actualizar URL'),
+                              ),
+                              const SizedBox(height: 24),
                   Text('Paleta visual', style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 8),
                   ValueListenableBuilder<UPSGlamPalette>(
@@ -74,12 +88,14 @@ class SettingsView extends StatelessWidget {
                       );
                     },
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Activa "UPS Institucional" para usar los colores oficiales del logo.',
-                    style: textTheme.bodySmall?.copyWith(color: Colors.white70),
-                  ),
-                        ],
+                              const SizedBox(height: 8),
+                              Text(
+                                'Activa "UPS Institucional" para usar los colores oficiales del logo.',
+                                style: textTheme.bodySmall?.copyWith(color: Colors.white70),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(height: 18),

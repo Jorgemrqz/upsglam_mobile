@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:upsglam_mobile/views/feed/feed_view.dart';
+import 'package:upsglam_mobile/services/auth_service.dart';
+import 'package:upsglam_mobile/views/auth/login_view.dart';
 import 'package:upsglam_mobile/widgets/glass_panel.dart';
 import 'package:upsglam_mobile/widgets/upsglam_background.dart';
 
@@ -18,6 +19,7 @@ class _RegisterViewState extends State<RegisterView> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
+  final AuthService _authService = AuthService.instance;
   bool _isLoading = false;
 
   @override
@@ -30,12 +32,31 @@ class _RegisterViewState extends State<RegisterView> {
   }
 
   Future<void> _createAccount() async {
-    if (!_formKey.currentState!.validate()) return;
+    final form = _formKey.currentState;
+    if (form == null || !form.validate()) return;
+
+    FocusScope.of(context).unfocus();
     setState(() => _isLoading = true);
-    await Future<void>.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    Navigator.pushReplacementNamed(context, FeedView.routeName);
+
+    try {
+      final message = await _authService.register(
+        name: _nameCtrl.text,
+        email: _emailCtrl.text,
+        password: _passwordCtrl.text,
+      );
+      if (!mounted) return;
+      _showSnack(message, isError: false);
+      Navigator.pushReplacementNamed(context, LoginView.routeName);
+    } on AuthException catch (error) {
+      if (!mounted) return;
+      _showSnack(error.message);
+    } catch (_) {
+      if (!mounted) return;
+      _showSnack('Ocurrió un error inesperado');
+    } finally {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -71,6 +92,7 @@ class _RegisterViewState extends State<RegisterView> {
                           children: [
                             TextFormField(
                               controller: _nameCtrl,
+                              enabled: !_isLoading,
                               decoration: const InputDecoration(
                                 labelText: 'Nombre completo',
                                 prefixIcon: Icon(Icons.badge_outlined),
@@ -81,6 +103,7 @@ class _RegisterViewState extends State<RegisterView> {
                             const SizedBox(height: 18),
                             TextFormField(
                               controller: _emailCtrl,
+                              enabled: !_isLoading,
                               keyboardType: TextInputType.emailAddress,
                               decoration: const InputDecoration(
                                 labelText: 'Correo institucional',
@@ -95,6 +118,7 @@ class _RegisterViewState extends State<RegisterView> {
                             const SizedBox(height: 18),
                             TextFormField(
                               controller: _passwordCtrl,
+                              enabled: !_isLoading,
                               obscureText: true,
                               decoration: const InputDecoration(
                                 labelText: 'Contraseña',
@@ -109,6 +133,7 @@ class _RegisterViewState extends State<RegisterView> {
                             const SizedBox(height: 18),
                             TextFormField(
                               controller: _confirmCtrl,
+                              enabled: !_isLoading,
                               obscureText: true,
                               decoration: const InputDecoration(
                                 labelText: 'Confirmar contraseña',
@@ -146,6 +171,15 @@ class _RegisterViewState extends State<RegisterView> {
             );
           },
         ),
+      ),
+    );
+  }
+
+  void _showSnack(String message, {bool isError = true}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? null : Colors.green,
       ),
     );
   }
