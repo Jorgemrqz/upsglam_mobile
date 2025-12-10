@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/api_config.dart';
+import '../models/profile.dart';
 
 class AuthException implements Exception {
   const AuthException(this.message, {this.statusCode});
@@ -26,6 +27,9 @@ class AuthService {
 
   static const String _accessTokenKey = 'upsglam.accessToken';
   static const String _refreshTokenKey = 'upsglam.refreshToken';
+  static const String _emailKey = 'upsglam.email';
+  static const String _firebaseUidKey = 'upsglam.firebaseUid';
+  static const String _profileKey = 'upsglam.profile';
 
   Future<String> register({
     required String name,
@@ -145,6 +149,9 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_accessTokenKey);
     await prefs.remove(_refreshTokenKey);
+    await prefs.remove(_emailKey);
+    await prefs.remove(_firebaseUidKey);
+    await prefs.remove(_profileKey);
   }
 
   Future<String?> getStoredAccessToken() => _readAccessToken();
@@ -166,11 +173,62 @@ class AuthService {
       throw const AuthException('El backend no retornó un token válido');
     }
     await _persistTokens(accessToken: accessToken, refreshToken: refreshToken);
+    await _persistSessionMetadata(
+      email: payload['email'] as String?,
+      firebaseUid: (payload['uid'] as String?) ?? (payload['firebaseUid'] as String?),
+      profileJson: payload['profile'] as Map<String, dynamic>?,
+    );
   }
 
-  Future<String?> _readAccessToken() async {
+  Future<void> _persistSessionMetadata({
+    String? email,
+    String? firebaseUid,
+    Map<String, dynamic>? profileJson,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_accessTokenKey);
+    if (email != null && email.isNotEmpty) {
+      await prefs.setString(_emailKey, email.trim());
+    } else {
+      await prefs.remove(_emailKey);
+    }
+    if (firebaseUid != null && firebaseUid.isNotEmpty) {
+      await prefs.setString(_firebaseUidKey, firebaseUid);
+    } else {
+      await prefs.remove(_firebaseUidKey);
+    }
+    if (profileJson != null && profileJson.isNotEmpty) {
+      await prefs.setString(_profileKey, jsonEncode(profileJson));
+    } else {
+      await prefs.remove(_profileKey);
+    }
+  }
+
+  Future<String?> _readAccessToken() => _readString(_accessTokenKey);
+
+  Future<String?> getStoredEmail() => _readString(_emailKey);
+
+  Future<String?> getStoredFirebaseUid() => _readString(_firebaseUidKey);
+
+  Future<ProfileModel?> getStoredProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_profileKey);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      return ProfileModel.fromJson(data);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> cacheProfile(ProfileModel profile) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_profileKey, jsonEncode(profile.toJson()));
+  }
+
+  Future<String?> _readString(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(key);
   }
 
   String? _extractMessage(String body) {
