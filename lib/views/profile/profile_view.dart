@@ -155,32 +155,16 @@ class _ProfileViewState extends State<ProfileView> {
                       profile.name,
                       style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Text(
                       '@${profile.username}',
                       style: textTheme.bodySmall?.copyWith(color: Colors.white70),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
                       _email ?? 'Correo no disponible',
                       style: textTheme.bodySmall,
                     ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: primary.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: primary.withValues(alpha: 0.35)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.auto_awesome, size: 14, color: accent),
-                    const SizedBox(width: 6),
-                    Text('GPU Ready', style: textTheme.labelMedium),
                   ],
                 ),
               ),
@@ -192,6 +176,11 @@ class _ProfileViewState extends State<ProfileView> {
                 ? profile.bio!
                 : 'Comparte tus resultados WebFlux + GPU con la comunidad.',
             style: textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: _GpuBadge(primary: primary, accent: accent, textTheme: textTheme),
           ),
         ],
       ),
@@ -352,6 +341,34 @@ class _ProfileDetailRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _GpuBadge extends StatelessWidget {
+  const _GpuBadge({required this.primary, required this.accent, required this.textTheme});
+
+  final Color primary;
+  final Color accent;
+  final TextTheme textTheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: primary.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: primary.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.auto_awesome, size: 14, color: accent),
+          const SizedBox(width: 6),
+          Text('GPU Ready', style: textTheme.labelMedium),
+        ],
+      ),
     );
   }
 }

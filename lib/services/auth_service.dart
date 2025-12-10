@@ -226,6 +226,110 @@ class AuthService {
     await prefs.setString(_profileKey, jsonEncode(profile.toJson()));
   }
 
+  Future<ProfileModel> uploadAvatar({
+    required List<int> bytes,
+    String fileName = 'avatar.png',
+  }) async {
+    await ApiConfig.ensureInitialized();
+    final uid = await getStoredFirebaseUid();
+    if (uid == null || uid.isEmpty) {
+      throw const AuthException('No se encontró el identificador del usuario para subir el avatar');
+    }
+
+    final Uri uploadUri = ApiConfig.uriFor('/images/avatar');
+    final request = http.MultipartRequest('POST', uploadUri)
+      ..headers['X-User-Uid'] = uid;
+
+    final token = await _readAccessToken();
+    if (token != null && token.isNotEmpty) {
+      request.headers[HttpHeaders.authorizationHeader] = 'Bearer $token';
+    }
+
+    request.files.add(
+      http.MultipartFile.fromBytes('file', bytes, filename: fileName),
+    );
+
+    try {
+      final streamedResponse = await request.send().timeout(ApiConfig.defaultTimeout);
+      final body = await streamedResponse.stream.bytesToString();
+      if (streamedResponse.statusCode == 200 || streamedResponse.statusCode == 201) {
+        final profile = _parseProfileFromBody(body);
+        if (profile == null) {
+          throw const AuthException('El backend no retornó un perfil actualizado tras subir el avatar');
+        }
+        await cacheProfile(profile);
+        return profile;
+      }
+
+      throw AuthException(
+        _extractMessage(body) ?? 'No se pudo subir el avatar (${streamedResponse.statusCode})',
+        statusCode: streamedResponse.statusCode,
+      );
+    } on SocketException {
+      throw const AuthException('No se pudo conectar con el API Gateway');
+    } on TimeoutException {
+      throw const AuthException('El API Gateway tardó demasiado en responder');
+    }
+  }
+
+  Future<ProfileModel> updateProfile({
+    required String username,
+    required String name,
+    String? bio,
+    String? avatarUrl,
+  }) async {
+    await ApiConfig.ensureInitialized();
+    final token = await _readAccessToken();
+    if (token == null || token.isEmpty) {
+      throw const AuthException('Tu sesión expiró, vuelve a iniciar sesión para editar el perfil');
+    }
+
+    final payload = <String, dynamic>{
+      'username': username.trim(),
+      'name': name.trim(),
+    };
+
+    final trimmedBio = bio?.trim();
+    if (trimmedBio != null) {
+      payload['bio'] = trimmedBio;
+    }
+    if (avatarUrl != null && avatarUrl.trim().isNotEmpty) {
+      payload['avatarUrl'] = avatarUrl.trim();
+    }
+
+    final Uri updateUri = ApiConfig.uriFor('/users');
+    try {
+      final response = await _client
+          .post(
+            updateUri,
+            headers: {
+              HttpHeaders.contentTypeHeader: 'application/json',
+              HttpHeaders.authorizationHeader: 'Bearer $token',
+            },
+            body: jsonEncode(payload),
+          )
+          .timeout(ApiConfig.defaultTimeout);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final profile = _parseProfileFromBody(response.body);
+        if (profile == null) {
+          throw const AuthException('El backend no devolvió un perfil actualizado');
+        }
+        await cacheProfile(profile);
+        return profile;
+      }
+
+      throw AuthException(
+        _extractMessage(response.body) ?? 'No se pudo actualizar el perfil (${response.statusCode})',
+        statusCode: response.statusCode,
+      );
+    } on SocketException {
+      throw const AuthException('No se pudo conectar con el API Gateway');
+    } on TimeoutException {
+      throw const AuthException('El API Gateway tardó demasiado en responder');
+    }
+  }
+
   Future<String?> _readString(String key) async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(key);
@@ -241,5 +345,36 @@ class AuthService {
     } catch (_) {
       return null;
     }
+  }
+
+  ProfileModel? _parseProfileFromBody(String body) {
+    try {
+      final dynamic decoded = jsonDecode(body);
+      return _profileFromDecoded(decoded);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  ProfileModel? _profileFromDecoded(dynamic decoded) {
+    if (decoded is Map<String, dynamic>) {
+      final dynamic profilePayload = decoded['profile'] ?? decoded['data'];
+      if (profilePayload is Map<String, dynamic>) {
+        if (profilePayload.containsKey('profile')) {
+          return ProfileModel.fromJson(profilePayload['profile'] as Map<String, dynamic>);
+        }
+        if (_looksLikeProfile(profilePayload)) {
+          return ProfileModel.fromJson(profilePayload);
+        }
+      }
+      if (_looksLikeProfile(decoded)) {
+        return ProfileModel.fromJson(decoded);
+      }
+    }
+    return null;
+  }
+
+  bool _looksLikeProfile(Map<String, dynamic> data) {
+    return data.containsKey('id') && data.containsKey('name') && data.containsKey('username');
   }
 }
