@@ -39,6 +39,25 @@ class ProfileModel {
         if (createdAt != null) 'createdAt': createdAt!.millisecondsSinceEpoch,
       };
 
+  ProfileModel copyWith({
+    String? name,
+    String? username,
+    String? bio,
+    String? avatarUrl,
+    List<String>? avatarHistory,
+    DateTime? createdAt,
+  }) {
+    return ProfileModel(
+      id: id,
+      name: name ?? this.name,
+      username: username ?? this.username,
+      bio: bio ?? this.bio,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      avatarHistory: avatarHistory ?? this.avatarHistory,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
   static List<String> _parseHistory(dynamic raw) {
     if (raw is List) {
       return raw

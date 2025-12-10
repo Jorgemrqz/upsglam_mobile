@@ -47,6 +47,20 @@ class _ProfileViewState extends State<ProfileView> {
     Navigator.pushNamedAndRemoveUntil(context, LoginView.routeName, (_) => false);
   }
 
+  Future<void> _openEditProfile() async {
+    if (_profile == null) return;
+    final result = await Navigator.pushNamed(
+      context,
+      EditProfileView.routeName,
+      arguments: _profile,
+    );
+    if (!mounted) return;
+    if (result is ProfileModel) {
+      setState(() => _profile = result);
+      await _authService.cacheProfile(result);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -65,8 +79,7 @@ class _ProfileViewState extends State<ProfileView> {
           ),
           IconButton(
             icon: const Icon(Icons.edit_outlined),
-            onPressed:
-                _profile == null ? null : () => Navigator.pushNamed(context, EditProfileView.routeName),
+            onPressed: _profile == null ? null : _openEditProfile,
           ),
           const SizedBox(width: 8),
         ],
@@ -192,12 +205,6 @@ class _ProfileViewState extends State<ProfileView> {
           Text('Detalles de la cuenta', style: textTheme.titleMedium),
           const SizedBox(height: 16),
           _ProfileDetailRow(
-            icon: Icons.badge_outlined,
-            label: 'Identificador',
-            value: profile.id,
-          ),
-          const SizedBox(height: 12),
-          _ProfileDetailRow(
             icon: Icons.event_available,
             label: 'Creado',
             value: _formatDate(profile.createdAt),
@@ -213,6 +220,14 @@ class _ProfileViewState extends State<ProfileView> {
             icon: Icons.alternate_email_outlined,
             label: 'Usuario',
             value: '@${profile.username}',
+          ),
+          const SizedBox(height: 12),
+          _ProfileDetailRow(
+            icon: Icons.edit_note_outlined,
+            label: 'Bio',
+            value: profile.bio?.isNotEmpty == true
+                ? profile.bio!
+                : 'Aún no agregas tu bio',
           ),
         ],
       ),

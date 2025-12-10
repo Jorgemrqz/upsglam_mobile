@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:upsglam_mobile/models/profile.dart';
 import 'package:upsglam_mobile/views/auth/login_view.dart';
 import 'package:upsglam_mobile/views/auth/register_view.dart';
 import 'package:upsglam_mobile/views/auth/splash_screen.dart';
@@ -36,7 +37,8 @@ class AppRouter {
       case ProfileView.routeName:
         return _material(const ProfileView());
       case EditProfileView.routeName:
-        return _material(const EditProfileView());
+        final profile = settings.arguments as ProfileModel?;
+        return _material(EditProfileView(initialProfile: profile), settings);
       case SettingsView.routeName:
         return _material(const SettingsView());
       case GatewaySetupView.routeName:
@@ -46,6 +48,6 @@ class AppRouter {
     }
   }
 
-  static MaterialPageRoute<dynamic> _material(Widget child) =>
-      MaterialPageRoute<dynamic>(builder: (_) => child);
+  static MaterialPageRoute<dynamic> _material(Widget child, [RouteSettings? settings]) =>
+      MaterialPageRoute<dynamic>(builder: (_) => child, settings: settings);
 }
