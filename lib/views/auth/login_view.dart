@@ -203,10 +203,11 @@ class _LoginViewState extends State<LoginView> {
       if (!mounted) return;
       _showSnack('Ocurrió un error inesperado');
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

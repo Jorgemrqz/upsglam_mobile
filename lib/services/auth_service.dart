@@ -147,6 +147,8 @@ class AuthService {
     await prefs.remove(_refreshTokenKey);
   }
 
+  Future<String?> getStoredAccessToken() => _readAccessToken();
+
   Future<void> _persistTokens({required String accessToken, String? refreshToken}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_accessTokenKey, accessToken);

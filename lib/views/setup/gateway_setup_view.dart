@@ -55,8 +55,9 @@ class _GatewaySetupViewState extends State<GatewaySetupView> {
       if (!mounted) return;
       setState(() => _errorMessage = 'No se pudo guardar la URL, intenta nuevamente');
     } finally {
-      if (!mounted) return;
-      setState(() => _isSaving = false);
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 
