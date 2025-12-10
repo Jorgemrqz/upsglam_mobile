@@ -5,6 +5,7 @@ class ProfileModel {
     required this.username,
     this.bio,
     this.avatarUrl,
+    this.avatarData,
     this.avatarHistory = const <String>[],
     this.createdAt,
   });
@@ -14,6 +15,7 @@ class ProfileModel {
   final String username;
   final String? bio;
   final String? avatarUrl;
+  final String? avatarData;
   final List<String> avatarHistory;
   final DateTime? createdAt;
 
@@ -24,6 +26,7 @@ class ProfileModel {
       username: (json['username'] as String?)?.trim() ?? 'sin-username',
       bio: (json['bio'] as String?)?.trim(),
       avatarUrl: (json['avatarUrl'] as String?)?.trim(),
+      avatarData: (json['avatarData'] as String?)?.trim(),
       avatarHistory: _parseHistory(json['avatarHistory']),
       createdAt: _parseDate(json['createdAt']),
     );
@@ -35,6 +38,7 @@ class ProfileModel {
         'username': username,
         if (bio != null) 'bio': bio,
         if (avatarUrl != null) 'avatarUrl': avatarUrl,
+        if (avatarData != null) 'avatarData': avatarData,
         if (avatarHistory.isNotEmpty) 'avatarHistory': avatarHistory,
         if (createdAt != null) 'createdAt': createdAt!.millisecondsSinceEpoch,
       };
@@ -44,6 +48,7 @@ class ProfileModel {
     String? username,
     String? bio,
     String? avatarUrl,
+    String? avatarData,
     List<String>? avatarHistory,
     DateTime? createdAt,
   }) {
@@ -53,6 +58,7 @@ class ProfileModel {
       username: username ?? this.username,
       bio: bio ?? this.bio,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      avatarData: avatarData ?? this.avatarData,
       avatarHistory: avatarHistory ?? this.avatarHistory,
       createdAt: createdAt ?? this.createdAt,
     );

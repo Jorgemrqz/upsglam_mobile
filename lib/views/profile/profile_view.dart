@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:upsglam_mobile/models/profile.dart';
 import 'package:upsglam_mobile/services/auth_service.dart';
@@ -128,6 +130,7 @@ class _ProfileViewState extends State<ProfileView> {
   }
 
   Widget _buildHeader(ProfileModel profile, TextTheme textTheme, Color primary, Color accent) {
+    final avatarImage = _resolveAvatarImage(profile);
     return GlassPanel(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
       child: Column(
@@ -138,9 +141,8 @@ class _ProfileViewState extends State<ProfileView> {
             children: [
               CircleAvatar(
                 radius: 36,
-                backgroundImage:
-                    profile.avatarUrl != null ? NetworkImage(profile.avatarUrl!) : null,
-                child: profile.avatarUrl == null
+                backgroundImage: avatarImage,
+                child: avatarImage == null
                     ? Text(profile.initials, style: textTheme.titleLarge)
                     : null,
               ),
@@ -221,17 +223,23 @@ class _ProfileViewState extends State<ProfileView> {
             label: 'Usuario',
             value: '@${profile.username}',
           ),
-          const SizedBox(height: 12),
-          _ProfileDetailRow(
-            icon: Icons.edit_note_outlined,
-            label: 'Bio',
-            value: profile.bio?.isNotEmpty == true
-                ? profile.bio!
-                : 'Aún no agregas tu bio',
-          ),
         ],
       ),
     );
+  }
+
+  ImageProvider<Object>? _resolveAvatarImage(ProfileModel profile) {
+    if (profile.avatarData?.isNotEmpty == true) {
+      try {
+        return MemoryImage(base64Decode(profile.avatarData!));
+      } catch (_) {
+        // ignore and fallback to URL/initials
+      }
+    }
+    if (profile.avatarUrl?.isNotEmpty == true) {
+      return NetworkImage(profile.avatarUrl!);
+    }
+    return null;
   }
 
   Widget _buildAvatarHistory(ProfileModel profile, TextTheme textTheme) {
