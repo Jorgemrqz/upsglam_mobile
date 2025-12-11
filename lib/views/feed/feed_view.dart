@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:upsglam_mobile/config/firebase_initializer.dart';
 import 'package:upsglam_mobile/models/post.dart';
 import 'package:upsglam_mobile/services/post_service.dart';
 import 'package:upsglam_mobile/services/auth_service.dart';
+import 'package:upsglam_mobile/services/realtime_post_stream_service.dart';
 import 'package:upsglam_mobile/theme/upsglam_theme.dart';
 import 'package:upsglam_mobile/views/create_post/select_image_view.dart';
 import 'package:upsglam_mobile/views/feed/comments_view.dart';
@@ -22,8 +26,10 @@ class FeedView extends StatefulWidget {
 class _FeedViewState extends State<FeedView> {
   final PostService _postService = PostService.instance;
   final AuthService _authService = AuthService.instance;
+  final RealtimePostStreamService _realtimeService = RealtimePostStreamService.instance;
   final List<PostModel> _posts = <PostModel>[];
   final Set<String> _likingPosts = <String>{};
+  StreamSubscription<List<PostModel>>? _feedSubscription;
   String? _currentUserId;
   bool _loading = true;
 
@@ -32,6 +38,13 @@ class _FeedViewState extends State<FeedView> {
     super.initState();
     _loadSession();
     _loadFeed();
+    _attachRealtimeFeed();
+  }
+
+  @override
+  void dispose() {
+    _feedSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadSession() async {
@@ -59,6 +72,27 @@ class _FeedViewState extends State<FeedView> {
         setState(() => _loading = false);
       }
     }
+  }
+
+  void _attachRealtimeFeed() {
+    FirebaseInitializer.ensureInitialized().then((_) {
+      if (!mounted || !_realtimeService.isAvailable) {
+        return;
+      }
+      _feedSubscription?.cancel();
+      _feedSubscription = _realtimeService.watchFeed().listen(
+        (posts) {
+          if (!mounted) return;
+          setState(() {
+            _posts
+              ..clear()
+              ..addAll(posts);
+            _loading = false;
+          });
+        },
+        onError: (error) => debugPrint('Realtime feed stream error: $error'),
+      );
+    });
   }
 
   Future<void> _refreshFeed() async {

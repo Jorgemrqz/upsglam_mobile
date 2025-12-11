@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:upsglam_mobile/config/firebase_initializer.dart';
 import 'package:upsglam_mobile/models/post.dart';
 import 'package:upsglam_mobile/models/post_comment.dart';
 import 'package:upsglam_mobile/models/profile.dart';
+import 'package:upsglam_mobile/services/auth_service.dart';
 import 'package:upsglam_mobile/services/post_service.dart';
+import 'package:upsglam_mobile/services/realtime_post_stream_service.dart';
 import 'package:upsglam_mobile/services/user_directory_service.dart';
 import 'package:upsglam_mobile/widgets/glass_panel.dart';
 import 'package:upsglam_mobile/widgets/upsglam_background.dart';
@@ -19,13 +24,24 @@ class CommentsView extends StatefulWidget {
 class _CommentsViewState extends State<CommentsView> {
   final PostService _postService = PostService.instance;
   final UserDirectoryService _userDirectoryService = UserDirectoryService.instance;
+  final RealtimePostStreamService _realtimeService = RealtimePostStreamService.instance;
+  final AuthService _authService = AuthService.instance;
   final TextEditingController _commentController = TextEditingController();
   PostModel? _post;
   bool _sending = false;
   bool _loadingPost = false;
   final Map<String, ProfileModel?> _profileCache = <String, ProfileModel?>{};
+  StreamSubscription<PostModel?>? _postSubscription;
+  ProfileModel? _currentProfile;
+  String? _currentUserId;
 
   List<PostCommentModel> get _comments => _post?.commentItems ?? const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSession();
+  }
 
   @override
   void didChangeDependencies() {
@@ -33,19 +49,26 @@ class _CommentsViewState extends State<CommentsView> {
     final initial = ModalRoute.of(context)?.settings.arguments as PostModel?;
     if (_post == null && initial != null) {
       _post = initial;
+      _attachRealtime(initial.id);
       _reloadFromBackend(initial.id);
     }
   }
 
   @override
   void dispose() {
+    _postSubscription?.cancel();
     _commentController.dispose();
     super.dispose();
   }
 
-  Future<bool> _handleWillPop() async {
-    _popWithResult();
-    return false;
+  Future<void> _loadSession() async {
+    final profile = await _authService.getStoredProfile();
+    final uid = await _authService.getStoredFirebaseUid();
+    if (!mounted) return;
+    setState(() {
+      _currentProfile = profile;
+      _currentUserId = uid;
+    });
   }
 
   void _popWithResult() {
@@ -63,7 +86,7 @@ class _CommentsViewState extends State<CommentsView> {
       final fresh = await _postService.fetchPostById(postId);
       final hydrated = await _hydrateComments(fresh);
       if (!mounted) return;
-      setState(() => _post = hydrated);
+      _applyServerPost(hydrated, keepExistingIfEmpty: true);
     } on PostException catch (error) {
       _showSnack(error.message);
     } catch (_) {
@@ -73,6 +96,28 @@ class _CommentsViewState extends State<CommentsView> {
         setState(() => _loadingPost = false);
       }
     }
+  }
+
+  void _attachRealtime(String postId) {
+    if (postId.isEmpty) return;
+    FirebaseInitializer.ensureInitialized().then((_) {
+      if (!mounted || !_realtimeService.isAvailable) {
+        return;
+      }
+      _postSubscription?.cancel();
+      _postSubscription = _realtimeService.watchPostById(postId).listen(
+        (post) {
+          if (post == null) {
+            return;
+          }
+          _hydrateComments(post).then((hydrated) {
+            if (!mounted) return;
+            _applyServerPost(hydrated);
+          });
+        },
+        onError: (error) => debugPrint('Realtime comments stream error: $error'),
+      );
+    });
   }
 
   Future<void> _sendComment() async {
@@ -86,18 +131,30 @@ class _CommentsViewState extends State<CommentsView> {
       _showSnack('Escribe un comentario antes de enviarlo.');
       return;
     }
-    setState(() => _sending = true);
+    final optimisticComment = _buildOptimisticComment(text);
+    setState(() {
+      _sending = true;
+      _commentController.clear();
+      _post = post.withComments(<PostCommentModel>[...post.commentItems, optimisticComment]);
+    });
     try {
       final updated = await _postService.addComment(post.id, text);
       final hydrated = await _hydrateComments(updated);
       if (!mounted) return;
-      setState(() {
-        _post = hydrated;
-        _commentController.clear();
-      });
+      _applyServerPost(hydrated, keepExistingIfEmpty: true);
     } on PostException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _post = _removeCommentFromPost(optimisticComment.id);
+        _commentController.text = text;
+      });
       _showSnack(error.message);
     } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _post = _removeCommentFromPost(optimisticComment.id);
+        _commentController.text = text;
+      });
       _showSnack('No se pudo enviar el comentario.');
     } finally {
       if (mounted) {
@@ -149,6 +206,55 @@ class _CommentsViewState extends State<CommentsView> {
     return post.withComments(enriched);
   }
 
+  static const String _optimisticPrefix = 'temp-comment-';
+
+  void _applyServerPost(PostModel serverPost, {bool keepExistingIfEmpty = false}) {
+    final hasServerComments = serverPost.commentItems.isNotEmpty;
+    if (!hasServerComments && keepExistingIfEmpty) {
+      final current = _post;
+      if (current != null && current.commentItems.isNotEmpty) {
+        setState(() {
+          _post = serverPost.withComments(current.commentItems);
+        });
+        return;
+      }
+    }
+
+    if (hasServerComments) {
+      final filtered = serverPost.commentItems
+          .where((comment) => !comment.id.startsWith(_optimisticPrefix))
+          .toList(growable: false);
+      setState(() => _post = serverPost.withComments(filtered));
+    } else {
+      setState(() => _post = serverPost);
+    }
+  }
+
+  PostCommentModel _buildOptimisticComment(String text) {
+    final profile = _currentProfile;
+    final rawName = profile?.name ?? '';
+    final displayName = rawName.trim().isNotEmpty ? rawName.trim() : PostCommentModel.defaultAuthorName;
+    return PostCommentModel(
+      id: '$_optimisticPrefix${DateTime.now().microsecondsSinceEpoch}',
+      userId: _currentUserId ?? '',
+      text: text,
+      createdAt: DateTime.now(),
+      authorName: displayName,
+      authorAvatarUrl: profile?.avatarUrl,
+    );
+  }
+
+  PostModel? _removeCommentFromPost(String commentId) {
+    final current = _post;
+    if (current == null) {
+      return current;
+    }
+    final updated = current.commentItems
+        .where((comment) => comment.id != commentId)
+        .toList(growable: false);
+    return current.withComments(updated);
+  }
+
   String _formatTimeAgo(DateTime? date) {
     if (date == null) return 'recién';
     final diff = DateTime.now().difference(date);
@@ -162,8 +268,12 @@ class _CommentsViewState extends State<CommentsView> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final post = _post;
-    return WillPopScope(
-      onWillPop: _handleWillPop,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _popWithResult();
+      },
       child: Scaffold(
         extendBodyBehindAppBar: true,
         backgroundColor: Colors.transparent,

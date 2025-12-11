@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:upsglam_mobile/config/firebase_initializer.dart';
 import 'package:upsglam_mobile/config/api_config.dart';
 import 'package:upsglam_mobile/navigation/app_router.dart';
 import 'package:upsglam_mobile/theme/upsglam_theme.dart';
@@ -7,6 +8,7 @@ import 'package:upsglam_mobile/views/setup/gateway_setup_view.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await FirebaseInitializer.ensureInitialized();
   await ApiConfig.ensureInitialized();
   runApp(const UPSGlamApp());
 }
