@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:upsglam_mobile/models/post.dart';
 import 'package:upsglam_mobile/models/post_comment.dart';
+import 'package:upsglam_mobile/models/profile.dart';
 import 'package:upsglam_mobile/services/post_service.dart';
+import 'package:upsglam_mobile/services/user_directory_service.dart';
 import 'package:upsglam_mobile/widgets/glass_panel.dart';
 import 'package:upsglam_mobile/widgets/upsglam_background.dart';
 
@@ -16,10 +18,12 @@ class CommentsView extends StatefulWidget {
 
 class _CommentsViewState extends State<CommentsView> {
   final PostService _postService = PostService.instance;
+  final UserDirectoryService _userDirectoryService = UserDirectoryService.instance;
   final TextEditingController _commentController = TextEditingController();
   PostModel? _post;
   bool _sending = false;
   bool _loadingPost = false;
+  final Map<String, ProfileModel?> _profileCache = <String, ProfileModel?>{};
 
   List<PostCommentModel> get _comments => _post?.commentItems ?? const [];
 
@@ -57,8 +61,9 @@ class _CommentsViewState extends State<CommentsView> {
     setState(() => _loadingPost = true);
     try {
       final fresh = await _postService.fetchPostById(postId);
+      final hydrated = await _hydrateComments(fresh);
       if (!mounted) return;
-      setState(() => _post = fresh);
+      setState(() => _post = hydrated);
     } on PostException catch (error) {
       _showSnack(error.message);
     } catch (_) {
@@ -84,9 +89,10 @@ class _CommentsViewState extends State<CommentsView> {
     setState(() => _sending = true);
     try {
       final updated = await _postService.addComment(post.id, text);
+      final hydrated = await _hydrateComments(updated);
       if (!mounted) return;
       setState(() {
-        _post = updated;
+        _post = hydrated;
         _commentController.clear();
       });
     } on PostException catch (error) {
@@ -98,6 +104,49 @@ class _CommentsViewState extends State<CommentsView> {
         setState(() => _sending = false);
       }
     }
+  }
+
+  Future<PostModel> _hydrateComments(PostModel post) async {
+    final needingProfiles = <String>{};
+    for (final comment in post.commentItems) {
+      if (comment.needsProfileLookup && comment.userId.isNotEmpty) {
+        needingProfiles.add(comment.userId);
+      }
+    }
+    if (needingProfiles.isEmpty) {
+      return post;
+    }
+
+    final Map<String, ProfileModel?> resolved = <String, ProfileModel?>{};
+    for (final userId in needingProfiles) {
+      if (_profileCache.containsKey(userId)) {
+        resolved[userId] = _profileCache[userId];
+        continue;
+      }
+      try {
+        final profile = await _userDirectoryService.getProfile(userId);
+        resolved[userId] = profile;
+        _profileCache[userId] = profile;
+      } on UserDirectoryException catch (error) {
+        debugPrint('User directory error for $userId: ${error.message}');
+      }
+    }
+
+    final enriched = post.commentItems.map((comment) {
+      final profile = resolved[comment.userId] ?? _profileCache[comment.userId];
+      if (profile == null) return comment;
+      final normalizedName = profile.name.trim();
+      final newName = normalizedName.isNotEmpty ? normalizedName : comment.authorName;
+      final newAvatar = profile.avatarUrl?.trim().isNotEmpty == true
+          ? profile.avatarUrl
+          : comment.authorAvatarUrl;
+      if (newName == comment.authorName && newAvatar == comment.authorAvatarUrl) {
+        return comment;
+      }
+      return comment.copyWith(authorName: newName, authorAvatarUrl: newAvatar);
+    }).toList();
+
+    return post.withComments(enriched);
   }
 
   String _formatTimeAgo(DateTime? date) {

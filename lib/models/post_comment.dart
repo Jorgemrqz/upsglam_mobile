@@ -4,9 +4,11 @@ class PostCommentModel {
     required this.userId,
     required this.text,
     required this.createdAt,
-    this.authorName = 'Usuario UPSGlam',
+    this.authorName = defaultAuthorName,
     this.authorAvatarUrl,
   });
+
+  static const String defaultAuthorName = 'Usuario UPSGlam';
 
   final String id;
   final String userId;
@@ -20,9 +22,23 @@ class PostCommentModel {
       id: (json['id'] as String?)?.trim() ?? '',
       userId: (json['userId'] as String?)?.trim() ?? '',
       text: (json['text'] as String?)?.trim() ?? '',
-      authorName: (json['authorName'] as String?)?.trim() ?? 'Usuario UPSGlam',
+      authorName: (json['authorName'] as String?)?.trim() ?? defaultAuthorName,
       authorAvatarUrl: _resolveAvatar(json),
       createdAt: _parseDate(json['createdAt']),
+    );
+  }
+
+  PostCommentModel copyWith({
+    String? authorName,
+    String? authorAvatarUrl,
+  }) {
+    return PostCommentModel(
+      id: id,
+      userId: userId,
+      text: text,
+      createdAt: createdAt,
+      authorName: authorName ?? this.authorName,
+      authorAvatarUrl: authorAvatarUrl ?? this.authorAvatarUrl,
     );
   }
 
@@ -61,6 +77,12 @@ class PostCommentModel {
       buffer.write(part[0].toUpperCase());
     }
     return buffer.toString();
+  }
+
+  bool get needsProfileLookup {
+    final normalized = authorName.trim().toLowerCase();
+    final lacksName = normalized.isEmpty || normalized == defaultAuthorName.toLowerCase();
+    return authorAvatarUrl == null && lacksName;
   }
 
   static String? _resolveAvatar(Map<String, dynamic> json) {
