@@ -1,3 +1,5 @@
+import 'post_comment.dart';
+
 class PostModel {
   const PostModel({
     required this.id,
@@ -12,6 +14,7 @@ class PostModel {
     this.mask,
     this.createdAt,
     this.userId,
+    this.commentItems = const <PostCommentModel>[],
     this.likedByUserIds = const <String>[],
   });
 
@@ -27,10 +30,12 @@ class PostModel {
   final String? mask;
   final DateTime? createdAt;
   final String? userId;
+  final List<PostCommentModel> commentItems;
   final List<String> likedByUserIds;
 
   factory PostModel.fromJson(Map<String, dynamic> json) {
     final likeUsers = _parseStringList(json['likes']);
+    final comments = PostCommentModel.listFrom(json['comments']);
 
     return PostModel(
       id: (json['id'] as String?) ?? (json['postId'] as String?) ?? '',
@@ -44,15 +49,18 @@ class PostModel {
       content: (json['content'] as String?)?.trim(),
       authorName: (json['authorName'] as String?)?.trim() ?? 'Usuario UPSGlam',
       authorUsername: (json['authorUsername'] as String?)?.trim(),
-      authorAvatar: (json['authorAvatar'] as String?)?.trim(),
-      likes: _extractCount(json['likeCount']) ??
+      authorAvatar: _resolveAuthorAvatar(json),
+        likes: _extractCount(json['likeCount']) ??
           (likeUsers != null ? likeUsers.length : _extractCount(json['likes'])) ??
           0,
-      comments: _extractCount(json['comments']) ?? _extractCount(json['commentCount']) ?? 0,
+        comments: comments.isNotEmpty
+          ? comments.length
+          : _extractCount(json['comments']) ?? _extractCount(json['commentCount']) ?? 0,
       filter: (json['filter'] as String?)?.trim(),
       mask: (json['mask'] as String?)?.trim(),
       createdAt: _parseDate(json['createdAt']),
       userId: (json['userId'] as String?)?.trim(),
+        commentItems: List.unmodifiable(comments),
       likedByUserIds: likeUsers ?? const <String>[],
     );
   }
@@ -75,6 +83,7 @@ class PostModel {
     String? mask,
     DateTime? createdAt,
     String? userId,
+    List<PostCommentModel>? commentItems,
     List<String>? likedByUserIds,
   }) {
     return PostModel(
@@ -90,6 +99,7 @@ class PostModel {
       mask: mask ?? this.mask,
       createdAt: createdAt ?? this.createdAt,
       userId: userId ?? this.userId,
+      commentItems: commentItems ?? this.commentItems,
       likedByUserIds: likedByUserIds ?? this.likedByUserIds,
     );
   }
@@ -107,6 +117,21 @@ class PostModel {
         ? likes + 1
         : (likes > 0 ? likes - 1 : 0);
     return copyWith(likes: newLikes, likedByUserIds: List.unmodifiable(updatedIds));
+  }
+
+  PostModel withComments(List<PostCommentModel> comments) {
+    return copyWith(
+      comments: comments.length,
+      commentItems: List.unmodifiable(comments),
+    );
+  }
+
+  static String? _resolveAuthorAvatar(Map<String, dynamic> json) {
+    final fromUrl = (json['authorAvatarUrl'] as String?)?.trim();
+    if (fromUrl != null && fromUrl.isNotEmpty) return fromUrl;
+    final avatar = (json['authorAvatar'] as String?)?.trim();
+    if (avatar != null && avatar.isNotEmpty) return avatar;
+    return null;
   }
 
   static int? _extractCount(dynamic raw) {

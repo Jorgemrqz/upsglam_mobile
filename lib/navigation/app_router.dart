@@ -27,7 +27,7 @@ class AppRouter {
       case FeedView.routeName:
         return _material(const FeedView(), settings);
       case CommentsView.routeName:
-        return _material(const CommentsView());
+        return _material(const CommentsView(), settings);
       case SelectImageView.routeName:
         return _material(const SelectImageView(), settings);
       case FilterSelectionView.routeName:

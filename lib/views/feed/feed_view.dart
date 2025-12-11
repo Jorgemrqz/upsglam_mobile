@@ -86,6 +86,18 @@ class _FeedViewState extends State<FeedView> {
     }
   }
 
+  Future<void> _openComments(PostModel post) async {
+    final result = await Navigator.pushNamed(
+      context,
+      CommentsView.routeName,
+      arguments: post,
+    );
+    if (!mounted) return;
+    if (result is PostModel) {
+      setState(() => _replacePost(result));
+    }
+  }
+
   Future<void> _toggleLike(String postId) async {
     final uid = _currentUserId;
     if (uid == null || uid.isEmpty) {
@@ -265,6 +277,7 @@ class _FeedViewState extends State<FeedView> {
                                 liked: post.isLikedBy(_currentUserId),
                                 liking: _likingPosts.contains(post.id),
                                 onToggleLike: () => _toggleLike(post.id),
+                                onOpenComments: () => _openComments(post),
                               );
                             },
                           ),
@@ -288,12 +301,14 @@ class _PostCard extends StatelessWidget {
     required this.liked,
     required this.onToggleLike,
     required this.liking,
+    required this.onOpenComments,
   });
 
   final PostModel post;
   final bool liked;
   final VoidCallback onToggleLike;
   final bool liking;
+  final VoidCallback onOpenComments;
 
   String _formatTimeAgo(DateTime? date) {
     if (date == null) return 'recién';
@@ -350,7 +365,7 @@ class _PostCard extends StatelessWidget {
               const Spacer(),
               IconButton(
                 icon: const Icon(Icons.chat_bubble_outline),
-                onPressed: () => Navigator.pushNamed(context, CommentsView.routeName),
+                onPressed: onOpenComments,
               ),
             ],
           ),
@@ -411,7 +426,7 @@ class _PostCard extends StatelessWidget {
               ),
               const Spacer(),
               TextButton(
-                onPressed: () => Navigator.pushNamed(context, CommentsView.routeName),
+                onPressed: onOpenComments,
                 child: Text('Comentarios (${post.comments})'),
               ),
             ],

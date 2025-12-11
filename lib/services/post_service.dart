@@ -155,6 +155,70 @@ class PostService {
 
   Future<PostModel> unlikePost(String postId) => _mutateLike(postId, like: false);
 
+  Future<PostModel> fetchPostById(String postId) async {
+    await ApiConfig.ensureInitialized();
+    final uri = ApiConfig.uriFor('/posts/$postId');
+    final headers = await _authorizedHeaders(optional: true);
+    try {
+      final response = await _client
+          .get(uri, headers: headers)
+          .timeout(ApiConfig.defaultTimeout);
+      if (response.statusCode == 200) {
+        return _parsePostFromBody(
+          response.body.trim(),
+          emptyMessage: 'El backend no devolvió datos del post',
+        );
+      }
+      throw PostException(
+        _extractMessage(response.body) ?? 'No se pudo obtener el post (${response.statusCode})',
+        statusCode: response.statusCode,
+      );
+    } on SocketException {
+      throw const PostException('No se pudo conectar con el API Gateway');
+    } on TimeoutException {
+      throw const PostException('El API Gateway tardó demasiado en responder');
+    }
+  }
+
+  Future<PostModel> addComment(String postId, String text) async {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) {
+      throw const PostException('Escribe un comentario antes de enviarlo');
+    }
+    await ApiConfig.ensureInitialized();
+    final headers = await _authorizedHeaders();
+    final uri = ApiConfig.uriFor('/posts/$postId/comments');
+    final payloadHeaders = {
+      ...headers,
+      HttpHeaders.contentTypeHeader: 'application/json',
+    };
+    try {
+      final response = await _client
+          .post(
+            uri,
+            headers: payloadHeaders,
+            body: jsonEncode({'text': trimmed}),
+          )
+          .timeout(ApiConfig.defaultTimeout);
+
+      if (response.statusCode == 200) {
+        return _parsePostFromBody(
+          response.body.trim(),
+          emptyMessage: 'El backend no devolvió el post actualizado',
+        );
+      }
+
+      throw PostException(
+        _extractMessage(response.body) ?? 'No se pudo enviar el comentario (${response.statusCode})',
+        statusCode: response.statusCode,
+      );
+    } on SocketException {
+      throw const PostException('No se pudo conectar con el API Gateway');
+    } on TimeoutException {
+      throw const PostException('El API Gateway tardó demasiado en responder');
+    }
+  }
+
   Future<PostModel> _mutateLike(String postId, {required bool like}) async {
     await ApiConfig.ensureInitialized();
     final headers = await _authorizedHeaders();
