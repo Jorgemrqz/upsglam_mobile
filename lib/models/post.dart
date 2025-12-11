@@ -11,6 +11,7 @@ class PostModel {
     this.filter,
     this.mask,
     this.createdAt,
+    this.userId,
     this.likedByUserIds = const <String>[],
   });
 
@@ -25,6 +26,7 @@ class PostModel {
   final String? filter;
   final String? mask;
   final DateTime? createdAt;
+  final String? userId;
   final List<String> likedByUserIds;
 
   factory PostModel.fromJson(Map<String, dynamic> json) {
@@ -50,6 +52,7 @@ class PostModel {
       filter: (json['filter'] as String?)?.trim(),
       mask: (json['mask'] as String?)?.trim(),
       createdAt: _parseDate(json['createdAt']),
+      userId: (json['userId'] as String?)?.trim(),
       likedByUserIds: likeUsers ?? const <String>[],
     );
   }
@@ -57,6 +60,53 @@ class PostModel {
   bool isLikedBy(String? userId) {
     if (userId == null || userId.isEmpty) return false;
     return likedByUserIds.contains(userId);
+  }
+
+  PostModel copyWith({
+    String? id,
+    String? imageUrl,
+    String? authorName,
+    String? content,
+    String? authorUsername,
+    String? authorAvatar,
+    int? likes,
+    int? comments,
+    String? filter,
+    String? mask,
+    DateTime? createdAt,
+    String? userId,
+    List<String>? likedByUserIds,
+  }) {
+    return PostModel(
+      id: id ?? this.id,
+      imageUrl: imageUrl ?? this.imageUrl,
+      authorName: authorName ?? this.authorName,
+      content: content ?? this.content,
+      authorUsername: authorUsername ?? this.authorUsername,
+      authorAvatar: authorAvatar ?? this.authorAvatar,
+      likes: likes ?? this.likes,
+      comments: comments ?? this.comments,
+      filter: filter ?? this.filter,
+      mask: mask ?? this.mask,
+      createdAt: createdAt ?? this.createdAt,
+      userId: userId ?? this.userId,
+      likedByUserIds: likedByUserIds ?? this.likedByUserIds,
+    );
+  }
+
+  PostModel toggleLikeLocally(String userId, {required bool like}) {
+    final updatedIds = List<String>.from(likedByUserIds);
+    if (like) {
+      if (!updatedIds.contains(userId)) {
+        updatedIds.add(userId);
+      }
+    } else {
+      updatedIds.removeWhere((id) => id == userId);
+    }
+    final newLikes = like
+        ? likes + 1
+        : (likes > 0 ? likes - 1 : 0);
+    return copyWith(likes: newLikes, likedByUserIds: List.unmodifiable(updatedIds));
   }
 
   static int? _extractCount(dynamic raw) {

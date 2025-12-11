@@ -86,36 +86,61 @@ class _FeedViewState extends State<FeedView> {
     }
   }
 
-  Future<void> _toggleLike(PostModel post) async {
+  Future<void> _toggleLike(String postId) async {
     final uid = _currentUserId;
     if (uid == null || uid.isEmpty) {
       _showSnack('Debes iniciar sesión para dar like.');
       return;
     }
-    if (post.id.isEmpty || _likingPosts.contains(post.id)) {
+    if (postId.isEmpty || _likingPosts.contains(postId)) {
       return;
     }
 
-    setState(() => _likingPosts.add(post.id));
+    final index = _posts.indexWhere((element) => element.id == postId);
+    if (index == -1) {
+      return;
+    }
+    final current = _posts[index];
+    final alreadyLiked = current.isLikedBy(uid);
+    final optimistic = current.toggleLikeLocally(uid, like: !alreadyLiked);
+
+    setState(() {
+      _likingPosts.add(postId);
+      _posts[index] = optimistic;
+    });
     try {
-      final updated = post.isLikedBy(uid)
-          ? await _postService.unlikePost(post.id)
-          : await _postService.likePost(post.id);
+      final updated = alreadyLiked
+          ? await _postService.unlikePost(postId)
+          : await _postService.likePost(postId);
       if (!mounted) return;
       setState(() {
-        final index = _posts.indexWhere((element) => element.id == updated.id);
-        if (index != -1) {
-          _posts[index] = updated;
+        if (updated.isLikedBy(uid) == alreadyLiked) {
+          _replacePost(optimistic);
+        } else {
+          _replacePost(updated);
         }
       });
     } on PostException catch (error) {
+      if (mounted) {
+        setState(() => _replacePost(current));
+      }
       _showSnack(error.message);
     } catch (_) {
+      if (mounted) {
+        setState(() => _replacePost(current));
+      }
       _showSnack('No se pudo actualizar el like.');
     } finally {
       if (mounted) {
-        setState(() => _likingPosts.remove(post.id));
+        setState(() => _likingPosts.remove(postId));
       }
+    }
+  }
+
+  void _replacePost(PostModel updated) {
+    final index = _posts.indexWhere((element) => element.id == updated.id);
+    if (index != -1) {
+      _posts[index] = updated;
     }
   }
 
@@ -239,7 +264,7 @@ class _FeedViewState extends State<FeedView> {
                                 post: post,
                                 liked: post.isLikedBy(_currentUserId),
                                 liking: _likingPosts.contains(post.id),
-                                onToggleLike: () => _toggleLike(post),
+                                onToggleLike: () => _toggleLike(post.id),
                               );
                             },
                           ),
@@ -367,8 +392,8 @@ class _PostCard extends StatelessWidget {
               IconButton(
                 icon: liking
                     ? const SizedBox(
-                        width: 18,
-                        height: 18,
+                        width: 20,
+                        height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : Icon(
