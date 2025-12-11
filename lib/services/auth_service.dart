@@ -16,15 +16,21 @@ class AuthException implements Exception {
   final int? statusCode;
 
   @override
-  String toString() => 'AuthException(statusCode: $statusCode, message: $message)';
+  String toString() =>
+      'AuthException(statusCode: $statusCode, message: $message)';
 }
 
 class AuthService {
-  AuthService._internal({http.Client? client}) : _client = client ?? http.Client();
+  AuthService._internal({http.Client? client})
+    : _client = client ?? http.Client();
 
   static final AuthService instance = AuthService._internal();
 
   final http.Client _client;
+  final StreamController<ProfileModel> _profileStreamController =
+      StreamController<ProfileModel>.broadcast();
+
+  Stream<ProfileModel> get profileUpdates => _profileStreamController.stream;
 
   static const String _accessTokenKey = 'upsglam.accessToken';
   static const String _refreshTokenKey = 'upsglam.refreshToken';
@@ -43,9 +49,7 @@ class AuthService {
       final response = await _client
           .post(
             registerUri,
-            headers: const {
-              HttpHeaders.contentTypeHeader: 'application/json',
-            },
+            headers: const {HttpHeaders.contentTypeHeader: 'application/json'},
             body: jsonEncode({
               'userName': name.trim(),
               'email': email.trim(),
@@ -59,7 +63,8 @@ class AuthService {
       }
 
       throw AuthException(
-        _extractMessage(response.body) ?? 'No se pudo registrar (${response.statusCode})',
+        _extractMessage(response.body) ??
+            'No se pudo registrar (${response.statusCode})',
         statusCode: response.statusCode,
       );
     } on StateError catch (error) {
@@ -78,13 +83,8 @@ class AuthService {
       final response = await _client
           .post(
             loginUri,
-            headers: const {
-              HttpHeaders.contentTypeHeader: 'application/json',
-            },
-            body: jsonEncode({
-              'email': email.trim(),
-              'password': password,
-            }),
+            headers: const {HttpHeaders.contentTypeHeader: 'application/json'},
+            body: jsonEncode({'email': email.trim(), 'password': password}),
           )
           .timeout(ApiConfig.defaultTimeout);
 
@@ -94,7 +94,8 @@ class AuthService {
       }
 
       throw AuthException(
-        _extractMessage(response.body) ?? 'Error al autenticar (${response.statusCode})',
+        _extractMessage(response.body) ??
+            'Error al autenticar (${response.statusCode})',
         statusCode: response.statusCode,
       );
     } on StateError catch (error) {
@@ -118,9 +119,7 @@ class AuthService {
       final response = await _client
           .get(
             meUri,
-            headers: {
-              HttpHeaders.authorizationHeader: 'Bearer $token',
-            },
+            headers: {HttpHeaders.authorizationHeader: 'Bearer $token'},
           )
           .timeout(ApiConfig.defaultTimeout);
 
@@ -134,7 +133,8 @@ class AuthService {
       }
 
       throw AuthException(
-        _extractMessage(response.body) ?? 'No se pudo validar la sesión (${response.statusCode})',
+        _extractMessage(response.body) ??
+            'No se pudo validar la sesión (${response.statusCode})',
         statusCode: response.statusCode,
       );
     } on StateError {
@@ -157,7 +157,10 @@ class AuthService {
 
   Future<String?> getStoredAccessToken() => _readAccessToken();
 
-  Future<void> _persistTokens({required String accessToken, String? refreshToken}) async {
+  Future<void> _persistTokens({
+    required String accessToken,
+    String? refreshToken,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_accessTokenKey, accessToken);
     if (refreshToken != null && refreshToken.isNotEmpty) {
@@ -166,7 +169,8 @@ class AuthService {
   }
 
   Future<void> _persistTokensFromBody(String body) async {
-    final Map<String, dynamic> payload = jsonDecode(body) as Map<String, dynamic>;
+    final Map<String, dynamic> payload =
+        jsonDecode(body) as Map<String, dynamic>;
     final String? accessToken =
         (payload['accessToken'] as String?) ?? (payload['jwt'] as String?);
     final String? refreshToken = payload['refreshToken'] as String?;
@@ -176,7 +180,8 @@ class AuthService {
     await _persistTokens(accessToken: accessToken, refreshToken: refreshToken);
     await _persistSessionMetadata(
       email: payload['email'] as String?,
-      firebaseUid: (payload['uid'] as String?) ?? (payload['firebaseUid'] as String?),
+      firebaseUid:
+          (payload['uid'] as String?) ?? (payload['firebaseUid'] as String?),
       profileJson: payload['profile'] as Map<String, dynamic>?,
     );
   }
@@ -225,6 +230,7 @@ class AuthService {
   Future<void> cacheProfile(ProfileModel profile) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_profileKey, jsonEncode(profile.toJson()));
+    _profileStreamController.add(profile);
   }
 
   Future<ProfileModel> uploadAvatar({
@@ -234,9 +240,12 @@ class AuthService {
     await ApiConfig.ensureInitialized();
     final uid = await getStoredFirebaseUid();
     if (uid == null || uid.isEmpty) {
-      throw const AuthException('No se encontró el identificador del usuario para subir el avatar');
+      throw const AuthException(
+        'No se encontró el identificador del usuario para subir el avatar',
+      );
     }
 
+    // 1. Subir imagen al image-service
     final Uri uploadUri = ApiConfig.uriFor('/images/avatar');
     final request = http.MultipartRequest('POST', uploadUri)
       ..headers['X-User-Uid'] = uid;
@@ -250,26 +259,88 @@ class AuthService {
       http.MultipartFile.fromBytes('file', bytes, filename: fileName),
     );
 
+    String uploadedUrl;
     try {
-      final streamedResponse = await request.send().timeout(ApiConfig.defaultTimeout);
+      final streamedResponse = await request.send().timeout(
+        ApiConfig.defaultTimeout,
+      );
       final body = await streamedResponse.stream.bytesToString();
-      if (streamedResponse.statusCode == 200 || streamedResponse.statusCode == 201) {
-        final profile = _parseProfileFromBody(body);
-        if (profile == null) {
-          throw const AuthException('El backend no retornó un perfil actualizado tras subir el avatar');
+
+      if (streamedResponse.statusCode == 200 ||
+          streamedResponse.statusCode == 201) {
+        // Parsear AvatarUploadResponse (image-service)
+        final decoded = jsonDecode(body);
+        if (decoded is Map<String, dynamic> &&
+            decoded.containsKey('avatarUrl')) {
+          uploadedUrl = decoded['avatarUrl'] as String;
+        } else {
+          throw const AuthException(
+            'La respuesta del servidor de imágenes no contiene la URL',
+          );
         }
-        await cacheProfile(profile);
-        return profile;
+      } else {
+        throw AuthException(
+          _extractMessage(body) ??
+              'No se pudo subir el avatar (${streamedResponse.statusCode})',
+          statusCode: streamedResponse.statusCode,
+        );
+      }
+    } on SocketException {
+      throw const AuthException(
+        'No se pudo conectar con el API Gateway (Image Service)',
+      );
+    } on TimeoutException {
+      throw const AuthException(
+        'El API Gateway tardó demasiado en responder (Image Service)',
+      );
+    }
+
+    // 2. Vincular avatar al usuario (user-service)
+    return _addAvatarToUser(uid, uploadedUrl);
+  }
+
+  Future<ProfileModel> _addAvatarToUser(String userId, String avatarUrl) async {
+    await ApiConfig.ensureInitialized();
+    final token = await _readAccessToken();
+    final Uri linkUri = ApiConfig.uriFor('/users/$userId/avatars');
+
+    try {
+      final response = await _client
+          .post(
+            linkUri,
+            headers: {
+              HttpHeaders.contentTypeHeader: 'application/json',
+              if (token != null)
+                HttpHeaders.authorizationHeader: 'Bearer $token',
+            },
+            body: jsonEncode({'avatarUrl': avatarUrl}),
+          )
+          .timeout(ApiConfig.defaultTimeout);
+
+      if (response.statusCode == 200) {
+        final profile = _parseProfileFromBody(response.body);
+        if (profile != null) {
+          await cacheProfile(profile);
+          return profile;
+        }
+        throw const AuthException(
+          'El backend no retornó el perfil actualizado',
+        );
       }
 
       throw AuthException(
-        _extractMessage(body) ?? 'No se pudo subir el avatar (${streamedResponse.statusCode})',
-        statusCode: streamedResponse.statusCode,
+        _extractMessage(response.body) ??
+            'No se pudo actualizar el avatar del usuario (${response.statusCode})',
+        statusCode: response.statusCode,
       );
     } on SocketException {
-      throw const AuthException('No se pudo conectar con el API Gateway');
+      throw const AuthException(
+        'No se pudo conectar con el API Gateway (User Service)',
+      );
     } on TimeoutException {
-      throw const AuthException('El API Gateway tardó demasiado en responder');
+      throw const AuthException(
+        'El API Gateway tardó demasiado en responder (User Service)',
+      );
     }
   }
 
@@ -282,7 +353,9 @@ class AuthService {
     await ApiConfig.ensureInitialized();
     final token = await _readAccessToken();
     if (token == null || token.isEmpty) {
-      throw const AuthException('Tu sesión expiró, vuelve a iniciar sesión para procesar imágenes');
+      throw const AuthException(
+        'Tu sesión expiró, vuelve a iniciar sesión para procesar imágenes',
+      );
     }
 
     final Uri uploadUri = ApiConfig.uriFor('/images/upload');
@@ -296,9 +369,12 @@ class AuthService {
     );
 
     try {
-      final streamedResponse = await request.send().timeout(ApiConfig.defaultTimeout);
+      final streamedResponse = await request.send().timeout(
+        ApiConfig.defaultTimeout,
+      );
       final body = await streamedResponse.stream.bytesToString();
-      if (streamedResponse.statusCode == 200 || streamedResponse.statusCode == 201) {
+      if (streamedResponse.statusCode == 200 ||
+          streamedResponse.statusCode == 201) {
         final decoded = jsonDecode(body);
         if (decoded is Map<String, dynamic>) {
           final result = ProcessedImageResult.fromJson(decoded);
@@ -306,11 +382,14 @@ class AuthService {
             return result;
           }
         }
-        throw const AuthException('El backend no retornó las URLs de la imagen procesada');
+        throw const AuthException(
+          'El backend no retornó las URLs de la imagen procesada',
+        );
       }
 
       throw AuthException(
-        _extractMessage(body) ?? 'No se pudo procesar la imagen (${streamedResponse.statusCode})',
+        _extractMessage(body) ??
+            'No se pudo procesar la imagen (${streamedResponse.statusCode})',
         statusCode: streamedResponse.statusCode,
       );
     } on SocketException {
@@ -329,7 +408,23 @@ class AuthService {
     await ApiConfig.ensureInitialized();
     final token = await _readAccessToken();
     if (token == null || token.isEmpty) {
-      throw const AuthException('Tu sesión expiró, vuelve a iniciar sesión para editar el perfil');
+      throw const AuthException(
+        'Tu sesión expiró, vuelve a iniciar sesión para editar el perfil',
+      );
+    }
+
+    final profileData = await getStoredProfile();
+    final userId = profileData?.id;
+
+    // Si no tenemos ID local, intentamos usar el UID de Firebase o fallamos?
+    // User Service usa su propio ID (que suele ser el UID de Firebase en este diseño).
+    // Asumiremos que podemos usar el id del perfil guardado o el firebase uid.
+    final targetId = userId ?? await getStoredFirebaseUid();
+
+    if (targetId == null) {
+      throw const AuthException(
+        'No se pudo identificar al usuario para actualizar',
+      );
     }
 
     final payload = <String, dynamic>{
@@ -345,10 +440,11 @@ class AuthService {
       payload['avatarUrl'] = avatarUrl.trim();
     }
 
-    final Uri updateUri = ApiConfig.uriFor('/users');
+    // UPDATE: PUT /users/{id}
+    final Uri updateUri = ApiConfig.uriFor('/users/$targetId');
     try {
       final response = await _client
-          .post(
+          .put(
             updateUri,
             headers: {
               HttpHeaders.contentTypeHeader: 'application/json',
@@ -359,16 +455,28 @@ class AuthService {
           .timeout(ApiConfig.defaultTimeout);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
+        // user-service devuelve el objeto User directo (no envuelto en "profile" key a veces).
+        // _parseProfileFromBody intenta varias estructuras.
         final profile = _parseProfileFromBody(response.body);
         if (profile == null) {
-          throw const AuthException('El backend no devolvió un perfil actualizado');
+          // Fallback simple si es directo User json
+          try {
+            final directUser = ProfileModel.fromJson(jsonDecode(response.body));
+            await cacheProfile(directUser);
+            return directUser;
+          } catch (_) {
+            throw const AuthException(
+              'El backend no devolvió un perfil legible',
+            );
+          }
         }
         await cacheProfile(profile);
         return profile;
       }
 
       throw AuthException(
-        _extractMessage(response.body) ?? 'No se pudo actualizar el perfil (${response.statusCode})',
+        _extractMessage(response.body) ??
+            'No se pudo actualizar el perfil (${response.statusCode})',
         statusCode: response.statusCode,
       );
     } on SocketException {
@@ -409,7 +517,9 @@ class AuthService {
       final dynamic profilePayload = decoded['profile'] ?? decoded['data'];
       if (profilePayload is Map<String, dynamic>) {
         if (profilePayload.containsKey('profile')) {
-          return ProfileModel.fromJson(profilePayload['profile'] as Map<String, dynamic>);
+          return ProfileModel.fromJson(
+            profilePayload['profile'] as Map<String, dynamic>,
+          );
         }
         if (_looksLikeProfile(profilePayload)) {
           return ProfileModel.fromJson(profilePayload);
@@ -423,6 +533,8 @@ class AuthService {
   }
 
   bool _looksLikeProfile(Map<String, dynamic> data) {
-    return data.containsKey('id') && data.containsKey('name') && data.containsKey('username');
+    return data.containsKey('id') &&
+        data.containsKey('name') &&
+        data.containsKey('username');
   }
 }

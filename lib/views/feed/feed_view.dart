@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:upsglam_mobile/config/firebase_initializer.dart';
 import 'package:upsglam_mobile/models/post.dart';
+import 'package:upsglam_mobile/models/profile.dart';
 import 'package:upsglam_mobile/services/post_service.dart';
 import 'package:upsglam_mobile/services/auth_service.dart';
 import 'package:upsglam_mobile/services/realtime_post_stream_service.dart';
@@ -26,11 +27,13 @@ class FeedView extends StatefulWidget {
 class _FeedViewState extends State<FeedView> {
   final PostService _postService = PostService.instance;
   final AuthService _authService = AuthService.instance;
-  final RealtimePostStreamService _realtimeService = RealtimePostStreamService.instance;
+  final RealtimePostStreamService _realtimeService =
+      RealtimePostStreamService.instance;
   final List<PostModel> _posts = <PostModel>[];
   final Set<String> _likingPosts = <String>{};
   final Set<String> _managingPosts = <String>{};
   StreamSubscription<List<PostModel>>? _feedSubscription;
+  StreamSubscription<ProfileModel>? _profileSubscription;
   String? _currentUserId;
   bool _loading = true;
 
@@ -40,11 +43,16 @@ class _FeedViewState extends State<FeedView> {
     _loadSession();
     _loadFeed();
     _attachRealtimeFeed();
+    _profileSubscription = _authService.profileUpdates.listen(
+      _onProfileUpdated,
+    );
   }
 
   @override
+  @override
   void dispose() {
     _feedSubscription?.cancel();
+    _profileSubscription?.cancel();
     super.dispose();
   }
 
@@ -82,20 +90,17 @@ class _FeedViewState extends State<FeedView> {
         return;
       }
       _feedSubscription?.cancel();
-      _feedSubscription = _realtimeService.watchFeed().listen(
-        (posts) {
-          if (!mounted) return;
-          final merged = _mergeRealtimePosts(posts);
-          setState(() {
-            _posts
-              ..clear()
-              ..addAll(merged);
-            _sortPosts(_posts);
-            _loading = false;
-          });
-        },
-        onError: (error) => debugPrint('Realtime feed stream error: $error'),
-      );
+      _feedSubscription = _realtimeService.watchFeed().listen((posts) {
+        if (!mounted) return;
+        final merged = _mergeRealtimePosts(posts);
+        setState(() {
+          _posts
+            ..clear()
+            ..addAll(merged);
+          _sortPosts(_posts);
+          _loading = false;
+        });
+      }, onError: (error) => debugPrint('Realtime feed stream error: $error'));
     });
   }
 
@@ -116,8 +121,28 @@ class _FeedViewState extends State<FeedView> {
     }
   }
 
+  void _onProfileUpdated(ProfileModel profile) {
+    if (!mounted) return;
+    setState(() {
+      for (var i = 0; i < _posts.length; i++) {
+        if (_posts[i].userId == profile.id ||
+            _posts[i].authorUsername == profile.username) {
+          // Actualizamos nombre, avatar y usuario si coincide
+          _posts[i] = _posts[i].copyWith(
+            authorName: profile.name,
+            authorUsername: profile.username,
+            authorAvatar: profile.avatarUrl,
+          );
+        }
+      }
+    });
+  }
+
   Future<void> _handleCreatePost() async {
-    final result = await Navigator.pushNamed(context, SelectImageView.routeName);
+    final result = await Navigator.pushNamed(
+      context,
+      SelectImageView.routeName,
+    );
     if (!mounted) return;
     if (result is PostModel) {
       _showSnack('Post publicado ✨');
@@ -195,7 +220,10 @@ class _FeedViewState extends State<FeedView> {
     }
     setState(() => _managingPosts.add(post.id));
     try {
-      final updated = await _postService.updatePostContent(post.id, editedContent);
+      final updated = await _postService.updatePostContent(
+        post.id,
+        editedContent,
+      );
       if (!mounted) return;
       setState(() => _replacePost(updated));
       _showSnack('Descripción actualizada ✨');
@@ -216,7 +244,9 @@ class _FeedViewState extends State<FeedView> {
       builder: (context) {
         return AlertDialog(
           title: const Text('Eliminar post'),
-          content: const Text('Esta acción eliminará el post y todos sus comentarios. ¿Deseas continuar?'),
+          content: const Text(
+            'Esta acción eliminará el post y todos sus comentarios. ¿Deseas continuar?',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -328,26 +358,34 @@ class _FeedViewState extends State<FeedView> {
     final cachedById = <String, PostModel>{
       for (final post in _posts) post.id: post,
     };
-    return realtimePosts.map((incoming) {
-      final cached = cachedById[incoming.id];
-      if (cached == null) {
-        return incoming;
-      }
-      final mergedName = _isPlaceholderName(incoming.authorName)
-          ? cached.authorName
-          : incoming.authorName;
-      final mergedAvatar = _preferNonEmpty(incoming.authorAvatar, cached.authorAvatar);
-      final mergedUsername = _preferNonEmpty(incoming.authorUsername, cached.authorUsername);
-      final mergedFilter = incoming.filter ?? cached.filter;
-      final mergedMask = incoming.mask ?? cached.mask;
-      return incoming.copyWith(
-        authorName: mergedName,
-        authorAvatar: mergedAvatar,
-        authorUsername: mergedUsername,
-        filter: mergedFilter,
-        mask: mergedMask,
-      );
-    }).toList(growable: false);
+    return realtimePosts
+        .map((incoming) {
+          final cached = cachedById[incoming.id];
+          if (cached == null) {
+            return incoming;
+          }
+          final mergedName = _isPlaceholderName(incoming.authorName)
+              ? cached.authorName
+              : incoming.authorName;
+          final mergedAvatar = _preferNonEmpty(
+            incoming.authorAvatar,
+            cached.authorAvatar,
+          );
+          final mergedUsername = _preferNonEmpty(
+            incoming.authorUsername,
+            cached.authorUsername,
+          );
+          final mergedFilter = incoming.filter ?? cached.filter;
+          final mergedMask = incoming.mask ?? cached.mask;
+          return incoming.copyWith(
+            authorName: mergedName,
+            authorAvatar: mergedAvatar,
+            authorUsername: mergedUsername,
+            filter: mergedFilter,
+            mask: mergedMask,
+          );
+        })
+        .toList(growable: false);
   }
 
   bool _isPlaceholderName(String? name) {
@@ -379,7 +417,9 @@ class _FeedViewState extends State<FeedView> {
   }
 
   void _showSnack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -398,7 +438,9 @@ class _FeedViewState extends State<FeedView> {
             children: [
               Text(
                 'UPSGlam',
-                style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                style: textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               Text(
                 'GPU Filters · Firestore en vivo',
@@ -410,11 +452,13 @@ class _FeedViewState extends State<FeedView> {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
-            onPressed: () => Navigator.pushNamed(context, SettingsView.routeName),
+            onPressed: () =>
+                Navigator.pushNamed(context, SettingsView.routeName),
           ),
           IconButton(
             icon: const Icon(Icons.person_outline),
-            onPressed: () => Navigator.pushNamed(context, ProfileView.routeName),
+            onPressed: () =>
+                Navigator.pushNamed(context, ProfileView.routeName),
           ),
           const SizedBox(width: 12),
         ],
@@ -464,49 +508,57 @@ class _FeedViewState extends State<FeedView> {
                         ],
                       )
                     : _posts.isEmpty
-                        ? ListView(
-                            children: [
-                              const SizedBox(height: 80),
-                              GlassPanel(
-                                padding: const EdgeInsets.all(24),
-                                child: Column(
-                                  children: [
-                                    const Icon(Icons.timeline_outlined, size: 48, color: Colors.white38),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      'Aún no hay publicaciones',
-                                      style:
-                                          textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Sé el primero en subir un filtro desde tu GPU.',
-                                      style: textTheme.bodySmall?.copyWith(color: Colors.white70),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
+                    ? ListView(
+                        children: [
+                          const SizedBox(height: 80),
+                          GlassPanel(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              children: [
+                                const Icon(
+                                  Icons.timeline_outlined,
+                                  size: 48,
+                                  color: Colors.white38,
                                 ),
-                              ),
-                            ],
-                          )
-                        : ListView.separated(
-                            itemCount: _posts.length,
-                            separatorBuilder: (context, index) => const SizedBox(height: 20),
-                            itemBuilder: (context, index) {
-                              final post = _posts[index];
-                              return _PostCard(
-                                post: post,
-                                liked: post.isLikedBy(_currentUserId),
-                                liking: _likingPosts.contains(post.id),
-                                onToggleLike: () => _toggleLike(post.id),
-                                onOpenComments: () => _openComments(post),
-                                canManage: _isOwner(post),
-                                managing: _managingPosts.contains(post.id),
-                                onEditPost: () => _onEditPost(post),
-                                onDeletePost: () => _onDeletePost(post),
-                              );
-                            },
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Aún no hay publicaciones',
+                                  style: textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Sé el primero en subir un filtro desde tu GPU.',
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: Colors.white70,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
                           ),
+                        ],
+                      )
+                    : ListView.separated(
+                        itemCount: _posts.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 20),
+                        itemBuilder: (context, index) {
+                          final post = _posts[index];
+                          return _PostCard(
+                            post: post,
+                            liked: post.isLikedBy(_currentUserId),
+                            liking: _likingPosts.contains(post.id),
+                            onToggleLike: () => _toggleLike(post.id),
+                            onOpenComments: () => _openComments(post),
+                            canManage: _isOwner(post),
+                            managing: _managingPosts.contains(post.id),
+                            onEditPost: () => _onEditPost(post),
+                            onDeletePost: () => _onDeletePost(post),
+                          );
+                        },
+                      ),
               ),
             ),
           ],
@@ -565,8 +617,8 @@ class _PostCard extends StatelessWidget {
     }
 
     final initials = post.authorName.trim().isNotEmpty
-      ? post.authorName.trim().substring(0, 1).toUpperCase()
-      : 'UP';
+        ? post.authorName.trim().substring(0, 1).toUpperCase()
+        : 'UP';
 
     return GlassPanel(
       padding: const EdgeInsets.all(20),
@@ -576,11 +628,10 @@ class _PostCard extends StatelessWidget {
           Row(
             children: [
               CircleAvatar(
-                backgroundImage:
-                    post.authorAvatar != null ? NetworkImage(post.authorAvatar!) : null,
-                child: post.authorAvatar == null
-                  ? Text(initials)
+                backgroundImage: post.authorAvatar != null
+                    ? NetworkImage(post.authorAvatar!)
                     : null,
+                child: post.authorAvatar == null ? Text(initials) : null,
               ),
               const SizedBox(width: 12),
               Column(
@@ -588,7 +639,9 @@ class _PostCard extends StatelessWidget {
                 children: [
                   Text(
                     post.authorName,
-                    style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   Text(
                     '${_formatTimeAgo(post.createdAt)} · GPU Filter',
@@ -625,7 +678,9 @@ class _PostCard extends StatelessWidget {
                       value: 'delete',
                       child: Text(
                         'Eliminar post',
-                        style: TextStyle(color: Theme.of(context).colorScheme.error),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
                     ),
                   ],
@@ -654,7 +709,11 @@ class _PostCard extends StatelessWidget {
                 errorBuilder: (context, error, stackTrace) => Container(
                   color: Colors.black26,
                   child: const Center(
-                    child: Icon(Icons.broken_image_outlined, size: 48, color: Colors.white38),
+                    child: Icon(
+                      Icons.broken_image_outlined,
+                      size: 48,
+                      color: Colors.white38,
+                    ),
                   ),
                 ),
               ),
