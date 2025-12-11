@@ -25,17 +25,17 @@ class AppRouter {
       case RegisterView.routeName:
         return _material(const RegisterView());
       case FeedView.routeName:
-        return _material(const FeedView());
+        return _material(const FeedView(), settings);
       case CommentsView.routeName:
         return _material(const CommentsView());
       case SelectImageView.routeName:
-        return _material(const SelectImageView());
+        return _material(const SelectImageView(), settings);
       case FilterSelectionView.routeName:
-        return _material(const FilterSelectionView());
+        return _material(const FilterSelectionView(), settings);
       case PublishPostView.routeName:
-        return _material(const PublishPostView());
+        return _material(const PublishPostView(), settings);
       case ProfileView.routeName:
-        return _material(const ProfileView());
+        return _material(const ProfileView(), settings);
       case EditProfileView.routeName:
         final profile = settings.arguments as ProfileModel?;
         return _material(EditProfileView(initialProfile: profile), settings);

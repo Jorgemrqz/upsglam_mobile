@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/api_config.dart';
+import '../models/processed_image_result.dart';
 import '../models/profile.dart';
 
 class AuthException implements Exception {
@@ -263,6 +264,53 @@ class AuthService {
 
       throw AuthException(
         _extractMessage(body) ?? 'No se pudo subir el avatar (${streamedResponse.statusCode})',
+        statusCode: streamedResponse.statusCode,
+      );
+    } on SocketException {
+      throw const AuthException('No se pudo conectar con el API Gateway');
+    } on TimeoutException {
+      throw const AuthException('El API Gateway tardó demasiado en responder');
+    }
+  }
+
+  Future<ProcessedImageResult> processImage({
+    required List<int> bytes,
+    required String mask,
+    required String filter,
+    String fileName = 'image.png',
+  }) async {
+    await ApiConfig.ensureInitialized();
+    final token = await _readAccessToken();
+    if (token == null || token.isEmpty) {
+      throw const AuthException('Tu sesión expiró, vuelve a iniciar sesión para procesar imágenes');
+    }
+
+    final Uri uploadUri = ApiConfig.uriFor('/images/upload');
+    final request = http.MultipartRequest('POST', uploadUri)
+      ..headers[HttpHeaders.authorizationHeader] = 'Bearer $token'
+      ..fields['mask'] = mask.trim()
+      ..fields['filter'] = filter.trim();
+
+    request.files.add(
+      http.MultipartFile.fromBytes('file', bytes, filename: fileName),
+    );
+
+    try {
+      final streamedResponse = await request.send().timeout(ApiConfig.defaultTimeout);
+      final body = await streamedResponse.stream.bytesToString();
+      if (streamedResponse.statusCode == 200 || streamedResponse.statusCode == 201) {
+        final decoded = jsonDecode(body);
+        if (decoded is Map<String, dynamic>) {
+          final result = ProcessedImageResult.fromJson(decoded);
+          if (result.hasProcessedUrl || result.originalUrl != null) {
+            return result;
+          }
+        }
+        throw const AuthException('El backend no retornó las URLs de la imagen procesada');
+      }
+
+      throw AuthException(
+        _extractMessage(body) ?? 'No se pudo procesar la imagen (${streamedResponse.statusCode})',
         statusCode: streamedResponse.statusCode,
       );
     } on SocketException {
