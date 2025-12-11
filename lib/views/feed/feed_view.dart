@@ -62,6 +62,7 @@ class _FeedViewState extends State<FeedView> {
         _posts
           ..clear()
           ..addAll(posts);
+        _sortPosts(_posts);
       });
     } on PostException catch (error) {
       _showSnack(error.message);
@@ -83,10 +84,12 @@ class _FeedViewState extends State<FeedView> {
       _feedSubscription = _realtimeService.watchFeed().listen(
         (posts) {
           if (!mounted) return;
+          final merged = _mergeRealtimePosts(posts);
           setState(() {
             _posts
               ..clear()
-              ..addAll(posts);
+              ..addAll(merged);
+            _sortPosts(_posts);
             _loading = false;
           });
         },
@@ -103,6 +106,7 @@ class _FeedViewState extends State<FeedView> {
         _posts
           ..clear()
           ..addAll(posts);
+        _sortPosts(_posts);
       });
     } on PostException catch (error) {
       _showSnack(error.message);
@@ -188,6 +192,63 @@ class _FeedViewState extends State<FeedView> {
     if (index != -1) {
       _posts[index] = updated;
     }
+  }
+
+  List<PostModel> _mergeRealtimePosts(List<PostModel> realtimePosts) {
+    if (_posts.isEmpty) {
+      return List<PostModel>.from(realtimePosts);
+    }
+    final cachedById = <String, PostModel>{
+      for (final post in _posts) post.id: post,
+    };
+    return realtimePosts.map((incoming) {
+      final cached = cachedById[incoming.id];
+      if (cached == null) {
+        return incoming;
+      }
+      final mergedName = _isPlaceholderName(incoming.authorName)
+          ? cached.authorName
+          : incoming.authorName;
+      final mergedAvatar = _preferNonEmpty(incoming.authorAvatar, cached.authorAvatar);
+      final mergedUsername = _preferNonEmpty(incoming.authorUsername, cached.authorUsername);
+      final mergedFilter = incoming.filter ?? cached.filter;
+      final mergedMask = incoming.mask ?? cached.mask;
+      return incoming.copyWith(
+        authorName: mergedName,
+        authorAvatar: mergedAvatar,
+        authorUsername: mergedUsername,
+        filter: mergedFilter,
+        mask: mergedMask,
+      );
+    }).toList(growable: false);
+  }
+
+  bool _isPlaceholderName(String? name) {
+    if (name == null) {
+      return true;
+    }
+    final normalized = name.trim().toLowerCase();
+    return normalized.isEmpty || normalized == 'usuario upsglam';
+  }
+
+  String? _preferNonEmpty(String? primary, String? fallback) {
+    if (primary != null && primary.trim().isNotEmpty) {
+      return primary;
+    }
+    return fallback;
+  }
+
+  void _sortPosts(List<PostModel> posts) {
+    posts.sort(_comparePosts);
+  }
+
+  int _comparePosts(PostModel a, PostModel b) {
+    final aTime = a.createdAt?.millisecondsSinceEpoch ?? 0;
+    final bTime = b.createdAt?.millisecondsSinceEpoch ?? 0;
+    if (aTime != bTime) {
+      return bTime.compareTo(aTime);
+    }
+    return b.id.compareTo(a.id);
   }
 
   void _showSnack(String message) {
