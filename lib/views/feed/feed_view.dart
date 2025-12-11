@@ -29,6 +29,7 @@ class _FeedViewState extends State<FeedView> {
   final RealtimePostStreamService _realtimeService = RealtimePostStreamService.instance;
   final List<PostModel> _posts = <PostModel>[];
   final Set<String> _likingPosts = <String>{};
+  final Set<String> _managingPosts = <String>{};
   StreamSubscription<List<PostModel>>? _feedSubscription;
   String? _currentUserId;
   bool _loading = true;
@@ -119,8 +120,8 @@ class _FeedViewState extends State<FeedView> {
     final result = await Navigator.pushNamed(context, SelectImageView.routeName);
     if (!mounted) return;
     if (result is PostModel) {
-      setState(() => _posts.insert(0, result));
       _showSnack('Post publicado ✨');
+      _refreshFeed();
     }
   }
 
@@ -133,6 +134,132 @@ class _FeedViewState extends State<FeedView> {
     if (!mounted) return;
     if (result is PostModel) {
       setState(() => _replacePost(result));
+    }
+  }
+
+  bool _isOwner(PostModel post) {
+    final uid = _currentUserId;
+    if (uid == null || uid.isEmpty) {
+      return false;
+    }
+    return post.userId == uid;
+  }
+
+  Future<String?> _promptEditContent(PostModel post) async {
+    final controller = TextEditingController(text: post.content ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Editar descripción'),
+          content: TextField(
+            controller: controller,
+            maxLines: 4,
+            textInputAction: TextInputAction.done,
+            decoration: const InputDecoration(
+              hintText: 'Escribe una nueva descripción para tu post',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(controller.text),
+              child: const Text('Guardar'),
+            ),
+          ],
+        );
+      },
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
+    if (result == null) {
+      return null;
+    }
+    return result.trim();
+  }
+
+  Future<void> _onEditPost(PostModel post) async {
+    if (post.id.isEmpty) {
+      return;
+    }
+    final editedContent = await _promptEditContent(post);
+    if (editedContent == null) {
+      return;
+    }
+    final currentNormalized = (post.content ?? '').trim();
+    if (currentNormalized == editedContent.trim()) {
+      _showSnack('No hiciste cambios en la descripción.');
+      return;
+    }
+    setState(() => _managingPosts.add(post.id));
+    try {
+      final updated = await _postService.updatePostContent(post.id, editedContent);
+      if (!mounted) return;
+      setState(() => _replacePost(updated));
+      _showSnack('Descripción actualizada ✨');
+    } on PostException catch (error) {
+      _showSnack(error.message);
+    } catch (_) {
+      _showSnack('No se pudo editar el post.');
+    } finally {
+      if (mounted) {
+        setState(() => _managingPosts.remove(post.id));
+      }
+    }
+  }
+
+  Future<bool?> _confirmDelete(PostModel post) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Eliminar post'),
+          content: const Text('Esta acción eliminará el post y todos sus comentarios. ¿Deseas continuar?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.redAccent,
+              ),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _onDeletePost(PostModel post) async {
+    if (post.id.isEmpty) {
+      return;
+    }
+    final confirmed = await _confirmDelete(post);
+    if (confirmed != true) {
+      return;
+    }
+    setState(() => _managingPosts.add(post.id));
+    try {
+      await _postService.deletePost(post.id);
+      if (!mounted) return;
+      setState(() {
+        _posts.removeWhere((element) => element.id == post.id);
+      });
+      _showSnack('Post eliminado');
+    } on PostException catch (error) {
+      _showSnack(error.message);
+    } catch (_) {
+      _showSnack('No se pudo eliminar el post.');
+    } finally {
+      if (mounted) {
+        setState(() => _managingPosts.remove(post.id));
+      }
     }
   }
 
@@ -373,6 +500,10 @@ class _FeedViewState extends State<FeedView> {
                                 liking: _likingPosts.contains(post.id),
                                 onToggleLike: () => _toggleLike(post.id),
                                 onOpenComments: () => _openComments(post),
+                                canManage: _isOwner(post),
+                                managing: _managingPosts.contains(post.id),
+                                onEditPost: () => _onEditPost(post),
+                                onDeletePost: () => _onDeletePost(post),
                               );
                             },
                           ),
@@ -397,6 +528,10 @@ class _PostCard extends StatelessWidget {
     required this.onToggleLike,
     required this.liking,
     required this.onOpenComments,
+    required this.canManage,
+    required this.managing,
+    this.onEditPost,
+    this.onDeletePost,
   });
 
   final PostModel post;
@@ -404,6 +539,10 @@ class _PostCard extends StatelessWidget {
   final VoidCallback onToggleLike;
   final bool liking;
   final VoidCallback onOpenComments;
+  final bool canManage;
+  final bool managing;
+  final VoidCallback? onEditPost;
+  final VoidCallback? onDeletePost;
 
   String _formatTimeAgo(DateTime? date) {
     if (date == null) return 'recién';
@@ -458,6 +597,39 @@ class _PostCard extends StatelessWidget {
                 ],
               ),
               const Spacer(),
+              if (canManage && managing)
+                const SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: Padding(
+                    padding: EdgeInsets.all(6),
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              else if (canManage)
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      onEditPost?.call();
+                    } else if (value == 'delete') {
+                      onDeletePost?.call();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem<String>(
+                      value: 'edit',
+                      child: Text('Editar descripción'),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'delete',
+                      child: Text(
+                        'Eliminar post',
+                        style: TextStyle(color: Theme.of(context).colorScheme.error),
+                      ),
+                    ),
+                  ],
+                ),
               IconButton(
                 icon: const Icon(Icons.chat_bubble_outline),
                 onPressed: onOpenComments,

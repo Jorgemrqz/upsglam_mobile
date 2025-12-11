@@ -248,6 +248,66 @@ class PostService {
     }
   }
 
+  Future<PostModel> updatePostContent(String postId, String? content) async {
+    await ApiConfig.ensureInitialized();
+    final headers = await _authorizedHeaders();
+    final uri = ApiConfig.uriFor('/posts/$postId');
+    final payloadHeaders = {
+      ...headers,
+      HttpHeaders.contentTypeHeader: 'application/json',
+    };
+    final body = <String, dynamic>{'content': content?.trim() ?? ''};
+    try {
+      final response = await _client
+          .put(
+            uri,
+            headers: payloadHeaders,
+            body: jsonEncode(body),
+          )
+          .timeout(ApiConfig.defaultTimeout);
+
+      if (response.statusCode == 200) {
+        return _parsePostFromBody(
+          response.body.trim(),
+          emptyMessage: 'El backend no devolvió el post editado',
+        );
+      }
+
+      throw PostException(
+        _extractMessage(response.body) ?? 'No se pudo editar el post (${response.statusCode})',
+        statusCode: response.statusCode,
+      );
+    } on SocketException {
+      throw const PostException('No se pudo conectar con el API Gateway');
+    } on TimeoutException {
+      throw const PostException('El API Gateway tardó demasiado en responder');
+    }
+  }
+
+  Future<void> deletePost(String postId) async {
+    await ApiConfig.ensureInitialized();
+    final headers = await _authorizedHeaders();
+    final uri = ApiConfig.uriFor('/posts/$postId');
+    try {
+      final response = await _client
+          .delete(uri, headers: headers)
+          .timeout(ApiConfig.defaultTimeout);
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        return;
+      }
+
+      throw PostException(
+        _extractMessage(response.body) ?? 'No se pudo eliminar el post (${response.statusCode})',
+        statusCode: response.statusCode,
+      );
+    } on SocketException {
+      throw const PostException('No se pudo conectar con el API Gateway');
+    } on TimeoutException {
+      throw const PostException('El API Gateway tardó demasiado en responder');
+    }
+  }
+
   PostModel _parsePostFromBody(String rawBody, {required String emptyMessage}) {
     if (rawBody.isEmpty) {
       throw PostException(emptyMessage);
