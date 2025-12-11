@@ -11,6 +11,7 @@ class PostModel {
     this.filter,
     this.mask,
     this.createdAt,
+    this.likedByUserIds = const <String>[],
   });
 
   final String id;
@@ -24,8 +25,11 @@ class PostModel {
   final String? filter;
   final String? mask;
   final DateTime? createdAt;
+  final List<String> likedByUserIds;
 
   factory PostModel.fromJson(Map<String, dynamic> json) {
+    final likeUsers = _parseStringList(json['likes']);
+
     return PostModel(
       id: (json['id'] as String?) ?? (json['postId'] as String?) ?? '',
       imageUrl: () {
@@ -39,12 +43,20 @@ class PostModel {
       authorName: (json['authorName'] as String?)?.trim() ?? 'Usuario UPSGlam',
       authorUsername: (json['authorUsername'] as String?)?.trim(),
       authorAvatar: (json['authorAvatar'] as String?)?.trim(),
-      likes: _extractCount(json['likes']) ?? _extractCount(json['likeCount']) ?? 0,
+      likes: _extractCount(json['likeCount']) ??
+          (likeUsers != null ? likeUsers.length : _extractCount(json['likes'])) ??
+          0,
       comments: _extractCount(json['comments']) ?? _extractCount(json['commentCount']) ?? 0,
       filter: (json['filter'] as String?)?.trim(),
       mask: (json['mask'] as String?)?.trim(),
       createdAt: _parseDate(json['createdAt']),
+      likedByUserIds: likeUsers ?? const <String>[],
     );
+  }
+
+  bool isLikedBy(String? userId) {
+    if (userId == null || userId.isEmpty) return false;
+    return likedByUserIds.contains(userId);
   }
 
   static int? _extractCount(dynamic raw) {
@@ -58,6 +70,18 @@ class PostModel {
     if (raw is String) {
       final parsed = int.tryParse(raw);
       if (parsed != null) return parsed;
+    }
+    return null;
+  }
+
+  static List<String>? _parseStringList(dynamic raw) {
+    if (raw is Iterable) {
+      final result = raw
+          .whereType<String>()
+          .map((value) => value.trim())
+          .where((value) => value.isNotEmpty)
+          .toList();
+      return result.isEmpty ? null : List.unmodifiable(result);
     }
     return null;
   }

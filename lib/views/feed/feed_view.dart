@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:upsglam_mobile/models/post.dart';
 import 'package:upsglam_mobile/services/post_service.dart';
+import 'package:upsglam_mobile/services/auth_service.dart';
 import 'package:upsglam_mobile/theme/upsglam_theme.dart';
 import 'package:upsglam_mobile/views/create_post/select_image_view.dart';
 import 'package:upsglam_mobile/views/feed/comments_view.dart';
@@ -20,13 +21,23 @@ class FeedView extends StatefulWidget {
 
 class _FeedViewState extends State<FeedView> {
   final PostService _postService = PostService.instance;
+  final AuthService _authService = AuthService.instance;
   final List<PostModel> _posts = <PostModel>[];
+  final Set<String> _likingPosts = <String>{};
+  String? _currentUserId;
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
+    _loadSession();
     _loadFeed();
+  }
+
+  Future<void> _loadSession() async {
+    final uid = await _authService.getStoredFirebaseUid();
+    if (!mounted) return;
+    setState(() => _currentUserId = uid);
   }
 
   Future<void> _loadFeed() async {
@@ -72,6 +83,39 @@ class _FeedViewState extends State<FeedView> {
     if (result is PostModel) {
       setState(() => _posts.insert(0, result));
       _showSnack('Post publicado ✨');
+    }
+  }
+
+  Future<void> _toggleLike(PostModel post) async {
+    final uid = _currentUserId;
+    if (uid == null || uid.isEmpty) {
+      _showSnack('Debes iniciar sesión para dar like.');
+      return;
+    }
+    if (post.id.isEmpty || _likingPosts.contains(post.id)) {
+      return;
+    }
+
+    setState(() => _likingPosts.add(post.id));
+    try {
+      final updated = post.isLikedBy(uid)
+          ? await _postService.unlikePost(post.id)
+          : await _postService.likePost(post.id);
+      if (!mounted) return;
+      setState(() {
+        final index = _posts.indexWhere((element) => element.id == updated.id);
+        if (index != -1) {
+          _posts[index] = updated;
+        }
+      });
+    } on PostException catch (error) {
+      _showSnack(error.message);
+    } catch (_) {
+      _showSnack('No se pudo actualizar el like.');
+    } finally {
+      if (mounted) {
+        setState(() => _likingPosts.remove(post.id));
+      }
     }
   }
 
@@ -189,7 +233,15 @@ class _FeedViewState extends State<FeedView> {
                         : ListView.separated(
                             itemCount: _posts.length,
                             separatorBuilder: (context, index) => const SizedBox(height: 20),
-                            itemBuilder: (context, index) => _PostCard(post: _posts[index]),
+                            itemBuilder: (context, index) {
+                              final post = _posts[index];
+                              return _PostCard(
+                                post: post,
+                                liked: post.isLikedBy(_currentUserId),
+                                liking: _likingPosts.contains(post.id),
+                                onToggleLike: () => _toggleLike(post),
+                              );
+                            },
                           ),
               ),
             ),
@@ -206,9 +258,17 @@ class _FeedViewState extends State<FeedView> {
 }
 
 class _PostCard extends StatelessWidget {
-  const _PostCard({required this.post});
+  const _PostCard({
+    required this.post,
+    required this.liked,
+    required this.onToggleLike,
+    required this.liking,
+  });
 
   final PostModel post;
+  final bool liked;
+  final VoidCallback onToggleLike;
+  final bool liking;
 
   String _formatTimeAgo(DateTime? date) {
     if (date == null) return 'recién';
@@ -305,8 +365,17 @@ class _PostCard extends StatelessWidget {
           Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.favorite_border),
-                onPressed: () {},
+                icon: liking
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        liked ? Icons.favorite : Icons.favorite_border,
+                        color: liked ? Colors.pinkAccent : null,
+                      ),
+                onPressed: liking ? null : onToggleLike,
               ),
               const SizedBox(width: 4),
               Text('${post.likes}'),

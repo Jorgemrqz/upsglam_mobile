@@ -86,27 +86,10 @@ class PostService {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final rawBody = response.body.trim();
-        if (rawBody.isEmpty) {
-          throw const PostException('El backend no devolvió datos del post creado');
-        }
-        try {
-          final decoded = jsonDecode(rawBody);
-          if (decoded is Map<String, dynamic>) {
-            if (decoded['data'] is Map<String, dynamic>) {
-              return PostModel.fromJson(decoded['data'] as Map<String, dynamic>);
-            }
-            return PostModel.fromJson(decoded);
-          }
-          if (decoded is List && decoded.isNotEmpty) {
-            final first = decoded.first;
-            if (first is Map<String, dynamic>) {
-              return PostModel.fromJson(first);
-            }
-          }
-        } on FormatException {
-          throw PostException('Respuesta inesperada del backend: $rawBody');
-        }
-        throw const PostException('El backend no devolvió un JSON válido de post');
+        return _parsePostFromBody(
+          rawBody,
+          emptyMessage: 'El backend no devolvió datos del post creado',
+        );
       }
 
       throw PostException(
@@ -166,5 +149,62 @@ class PostService {
     } catch (_) {
       return null;
     }
+  }
+
+  Future<PostModel> likePost(String postId) => _mutateLike(postId, like: true);
+
+  Future<PostModel> unlikePost(String postId) => _mutateLike(postId, like: false);
+
+  Future<PostModel> _mutateLike(String postId, {required bool like}) async {
+    await ApiConfig.ensureInitialized();
+    final headers = await _authorizedHeaders();
+    final uri = ApiConfig.uriFor('/posts/$postId/likes');
+    try {
+      final response = await (like
+              ? _client.post(uri, headers: headers)
+              : _client.delete(uri, headers: headers))
+          .timeout(ApiConfig.defaultTimeout);
+
+      if (response.statusCode == 200) {
+        return _parsePostFromBody(
+          response.body.trim(),
+          emptyMessage: 'El backend no devolvió datos del post actualizado',
+        );
+      }
+
+      throw PostException(
+        _extractMessage(response.body) ??
+            'No se pudo ${like ? 'dar like' : 'quitar el like'} (${response.statusCode})',
+        statusCode: response.statusCode,
+      );
+    } on SocketException {
+      throw const PostException('No se pudo conectar con el API Gateway');
+    } on TimeoutException {
+      throw const PostException('El API Gateway tardó demasiado en responder');
+    }
+  }
+
+  PostModel _parsePostFromBody(String rawBody, {required String emptyMessage}) {
+    if (rawBody.isEmpty) {
+      throw PostException(emptyMessage);
+    }
+    try {
+      final decoded = jsonDecode(rawBody);
+      if (decoded is Map<String, dynamic>) {
+        if (decoded['data'] is Map<String, dynamic>) {
+          return PostModel.fromJson(decoded['data'] as Map<String, dynamic>);
+        }
+        return PostModel.fromJson(decoded);
+      }
+      if (decoded is List && decoded.isNotEmpty) {
+        final first = decoded.first;
+        if (first is Map<String, dynamic>) {
+          return PostModel.fromJson(first);
+        }
+      }
+    } on FormatException {
+      throw PostException('Respuesta inesperada del backend: $rawBody');
+    }
+    throw const PostException('El backend no devolvió un JSON válido de post');
   }
 }
