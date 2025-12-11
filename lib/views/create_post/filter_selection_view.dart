@@ -11,7 +11,14 @@ class FilterSelectionView extends StatefulWidget {
   const FilterSelectionView({super.key});
 
   static const routeName = '/filter-selection';
-  static const filters = <String>['Sobel', 'Laplacian', 'Gaussian', 'Emboss', 'UPS Logo'];
+  static const filters = <String>['Sobel', 'Gaussian', 'Emboss', 'Mean', 'UPS'];
+  static const Map<String, List<int>> filterKernelPresets = {
+    'Sobel': [3, 9, 15],
+    'Gaussian': [31, 71, 141],
+    'Emboss': [9, 21, 65],
+    'Mean': [3, 5, 7],
+    'UPS': [3, 5, 7],
+  };
 
   @override
   State<FilterSelectionView> createState() => _FilterSelectionViewState();
@@ -21,10 +28,20 @@ class _FilterSelectionViewState extends State<FilterSelectionView> {
   final AuthService _authService = AuthService.instance;
   FilterSelectionArguments? _arguments;
   String _selectedFilter = FilterSelectionView.filters.first;
-  int _maskValue = 3;
+  int _maskValue = FilterSelectionView.filterKernelPresets[FilterSelectionView.filters.first]!.first;
   bool _processing = false;
   String? _processedUrl;
   String? _originalUrl;
+  late final TextEditingController _kernelController;
+
+  @override
+  void initState() {
+    super.initState();
+    final defaultKernel =
+        FilterSelectionView.filterKernelPresets[_selectedFilter]?.first ?? 3;
+    _kernelController = TextEditingController(text: defaultKernel.toString());
+    _maskValue = defaultKernel;
+  }
 
   @override
   void didChangeDependencies() {
@@ -32,12 +49,35 @@ class _FilterSelectionViewState extends State<FilterSelectionView> {
     _arguments ??= ModalRoute.of(context)?.settings.arguments as FilterSelectionArguments?;
   }
 
-  String get _normalizedFilter => _selectedFilter.toLowerCase().replaceAll(' ', '_');
+  @override
+  void dispose() {
+    _kernelController.dispose();
+    super.dispose();
+  }
+
+  String get _normalizedFilter => _selectedFilter.toLowerCase();
+
+  List<int> get _currentKernelPresets =>
+      FilterSelectionView.filterKernelPresets[_selectedFilter] ?? const [3];
+
+  bool _syncKernelFromInput() {
+    final raw = _kernelController.text.trim();
+    final parsed = int.tryParse(raw);
+    if (parsed == null || parsed < 3 || parsed.isEven) {
+      _showSnack('El kernel debe ser un entero impar mayor o igual a 3.');
+      return false;
+    }
+    _maskValue = parsed;
+    return true;
+  }
 
   Future<void> _handleProcess() async {
     final args = _arguments;
     if (args == null) {
       _showSnack('Selecciona una imagen antes de aplicar filtros.');
+      return;
+    }
+    if (!_syncKernelFromInput()) {
       return;
     }
     setState(() => _processing = true);
@@ -213,25 +253,58 @@ class _FilterSelectionViewState extends State<FilterSelectionView> {
                                     return ChoiceChip(
                                       label: Text(filter),
                                       selected: selected,
-                                      onSelected: (_) => setState(() => _selectedFilter = filter),
+                                      onSelected: (_) {
+                                        if (!selected) {
+                                          setState(() {
+                                            _selectedFilter = filter;
+                                            final defaults =
+                                                FilterSelectionView.filterKernelPresets[filter];
+                                            final newKernel = (defaults?.first ?? 3).isOdd
+                                                ? defaults?.first ?? 3
+                                                : 3;
+                                            _maskValue = newKernel;
+                                            _kernelController.text = newKernel.toString();
+                                          });
+                                        }
+                                      },
                                     );
                                   }).toList(),
                                 ),
                                 const SizedBox(height: 18),
-                                Text('Tamaño de máscara (odd kernel)', style: textTheme.titleMedium),
+                                Text('Kernel (impar ≥ 3)', style: textTheme.titleMedium),
                                 const SizedBox(height: 8),
-                                DropdownButton<int>(
-                                  value: _maskValue,
-                                  onChanged: (value) {
-                                    if (value != null) {
-                                      setState(() => _maskValue = value);
-                                    }
-                                  },
-                                  items: const [3, 5, 7]
-                                      .map((value) => DropdownMenuItem(value: value, child: Text('Kernel $value')))
-                                      .toList(),
+                                TextField(
+                                  controller: _kernelController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                    prefixIcon: const Icon(Icons.memory_outlined),
+                                    hintText: 'Ingresa un kernel impar (ej. 31)',
+                                    helperText: _selectedFilter == 'UPS'
+                                        ? 'UPS valida el kernel pero usa valores fijos.'
+                                        : 'Recomendado: ${_currentKernelPresets.join(', ')}',
+                                  ),
+                                  onSubmitted: (_) => _syncKernelFromInput(),
                                 ),
                                 const SizedBox(height: 12),
+                                if (_currentKernelPresets.isNotEmpty)
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 6,
+                                    children: _currentKernelPresets
+                                        .map(
+                                          (value) => ActionChip(
+                                            label: Text('Kernel $value'),
+                                            onPressed: () {
+                                              setState(() {
+                                                _maskValue = value;
+                                                _kernelController.text = value.toString();
+                                              });
+                                            },
+                                          ),
+                                        )
+                                        .toList(),
+                                  ),
+                                if (_currentKernelPresets.isNotEmpty) const SizedBox(height: 12),
                                 FilledButton.icon(
                                   onPressed: _processing ? null : _handleProcess,
                                   icon: _processing
