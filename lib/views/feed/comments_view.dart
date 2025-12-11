@@ -21,6 +21,36 @@ class CommentsView extends StatefulWidget {
   State<CommentsView> createState() => _CommentsViewState();
 }
 
+class _OptimisticFingerprint {
+  const _OptimisticFingerprint({
+    required this.userId,
+    required this.normalizedText,
+    required this.toleranceMs,
+    this.createdAtMs,
+  });
+
+  final String userId;
+  final String normalizedText;
+  final int toleranceMs;
+  final int? createdAtMs;
+
+  bool matches(PostCommentModel comment) {
+    final candidateUserId = comment.userId.trim();
+    if (userId.isNotEmpty && candidateUserId.isNotEmpty && userId != candidateUserId) {
+      return false;
+    }
+    final candidateText = comment.text.trim().toLowerCase();
+    if (normalizedText.isNotEmpty && normalizedText != candidateText) {
+      return false;
+    }
+    final candidateCreatedAt = comment.createdAt?.millisecondsSinceEpoch;
+    if (createdAtMs == null || candidateCreatedAt == null) {
+      return true;
+    }
+    return (candidateCreatedAt - createdAtMs!).abs() <= toleranceMs;
+  }
+}
+
 class _CommentsViewState extends State<CommentsView> {
   final PostService _postService = PostService.instance;
   final UserDirectoryService _userDirectoryService = UserDirectoryService.instance;
@@ -34,6 +64,11 @@ class _CommentsViewState extends State<CommentsView> {
   StreamSubscription<PostModel?>? _postSubscription;
   ProfileModel? _currentProfile;
   String? _currentUserId;
+  final Set<String> _pendingOptimisticIds = <String>{};
+  final Map<String, _OptimisticFingerprint> _optimisticFingerprints =
+      <String, _OptimisticFingerprint>{};
+
+  static const int _optimisticMatchToleranceMs = 60000;
 
   List<PostCommentModel> get _comments => _post?.commentItems ?? const [];
 
@@ -62,13 +97,23 @@ class _CommentsViewState extends State<CommentsView> {
   }
 
   Future<void> _loadSession() async {
-    final profile = await _authService.getStoredProfile();
+    ProfileModel? profile = await _authService.getStoredProfile();
     final uid = await _authService.getStoredFirebaseUid();
+    if ((profile == null || profile.name.trim().isEmpty) && uid != null && uid.isNotEmpty) {
+      try {
+        profile = await _userDirectoryService.getProfile(uid);
+      } on UserDirectoryException catch (error) {
+        debugPrint('No se pudo hidratar el perfil local: ${error.message}');
+      }
+    }
     if (!mounted) return;
     setState(() {
       _currentProfile = profile;
       _currentUserId = uid;
     });
+    if (uid != null && uid.isNotEmpty && profile != null) {
+      _profileCache[uid] = profile;
+    }
   }
 
   void _popWithResult() {
@@ -86,7 +131,8 @@ class _CommentsViewState extends State<CommentsView> {
       final fresh = await _postService.fetchPostById(postId);
       final hydrated = await _hydrateComments(fresh);
       if (!mounted) return;
-      _applyServerPost(hydrated, keepExistingIfEmpty: true);
+      _applyServerPost(hydrated);
+      _applyRealtimeComments(hydrated.commentItems);
     } on PostException catch (error) {
       _showSnack(error.message);
     } catch (_) {
@@ -107,15 +153,16 @@ class _CommentsViewState extends State<CommentsView> {
       _postSubscription?.cancel();
       _postSubscription = _realtimeService.watchPostById(postId).listen(
         (post) {
-          if (post == null) {
+          if (!mounted || post == null) {
             return;
           }
           _hydrateComments(post).then((hydrated) {
             if (!mounted) return;
             _applyServerPost(hydrated);
+            _applyRealtimeComments(hydrated.commentItems);
           });
         },
-        onError: (error) => debugPrint('Realtime comments stream error: $error'),
+        onError: (error) => debugPrint('Realtime post stream error: $error'),
       );
     });
   }
@@ -132,6 +179,7 @@ class _CommentsViewState extends State<CommentsView> {
       return;
     }
     final optimisticComment = _buildOptimisticComment(text);
+    _registerOptimisticComment(optimisticComment);
     setState(() {
       _sending = true;
       _commentController.clear();
@@ -141,9 +189,11 @@ class _CommentsViewState extends State<CommentsView> {
       final updated = await _postService.addComment(post.id, text);
       final hydrated = await _hydrateComments(updated);
       if (!mounted) return;
-      _applyServerPost(hydrated, keepExistingIfEmpty: true);
+      _applyServerPost(hydrated);
+      _applyRealtimeComments(hydrated.commentItems);
     } on PostException catch (error) {
       if (!mounted) return;
+      _unregisterOptimisticComment(optimisticComment.id);
       setState(() {
         _post = _removeCommentFromPost(optimisticComment.id);
         _commentController.text = text;
@@ -151,6 +201,7 @@ class _CommentsViewState extends State<CommentsView> {
       _showSnack(error.message);
     } catch (_) {
       if (!mounted) return;
+      _unregisterOptimisticComment(optimisticComment.id);
       setState(() {
         _post = _removeCommentFromPost(optimisticComment.id);
         _commentController.text = text;
@@ -166,7 +217,14 @@ class _CommentsViewState extends State<CommentsView> {
   Future<PostModel> _hydrateComments(PostModel post) async {
     final needingProfiles = <String>{};
     for (final comment in post.commentItems) {
-      if (comment.needsProfileLookup && comment.userId.isNotEmpty) {
+      if (comment.userId.isEmpty) {
+        continue;
+      }
+      final normalizedAuthor = comment.authorName.trim();
+      final needsLookup = comment.needsProfileLookup ||
+          normalizedAuthor.isEmpty ||
+          normalizedAuthor == PostCommentModel.defaultAuthorName;
+      if (needsLookup) {
         needingProfiles.add(comment.userId);
       }
     }
@@ -189,7 +247,7 @@ class _CommentsViewState extends State<CommentsView> {
       }
     }
 
-    final enriched = post.commentItems.map((comment) {
+    final List<PostCommentModel> enriched = post.commentItems.map((comment) {
       final profile = resolved[comment.userId] ?? _profileCache[comment.userId];
       if (profile == null) return comment;
       final normalizedName = profile.name.trim();
@@ -201,42 +259,110 @@ class _CommentsViewState extends State<CommentsView> {
         return comment;
       }
       return comment.copyWith(authorName: newName, authorAvatarUrl: newAvatar);
-    }).toList();
+    }).toList(growable: true);
+
+    final uid = _currentUserId;
+    ProfileModel? selfProfile = _currentProfile;
+    if (selfProfile == null && uid != null && uid.isNotEmpty) {
+      selfProfile = _profileCache[uid];
+    }
+    if (uid != null && uid.isNotEmpty && selfProfile != null) {
+      for (var index = 0; index < enriched.length; index++) {
+        final comment = enriched[index];
+        if (comment.userId != uid) {
+          continue;
+        }
+        final normalizedName = selfProfile.name.trim();
+        final resolvedName = normalizedName.isNotEmpty ? normalizedName : comment.authorName;
+        final resolvedAvatar = selfProfile.avatarUrl?.trim().isNotEmpty == true
+            ? selfProfile.avatarUrl
+            : comment.authorAvatarUrl;
+        if (resolvedName != comment.authorName || resolvedAvatar != comment.authorAvatarUrl) {
+          enriched[index] = comment.copyWith(
+            authorName: resolvedName,
+            authorAvatarUrl: resolvedAvatar,
+          );
+        }
+      }
+    }
 
     return post.withComments(enriched);
   }
 
   static const String _optimisticPrefix = 'temp-comment-';
 
-  void _applyServerPost(PostModel serverPost, {bool keepExistingIfEmpty = false}) {
-    final hasServerComments = serverPost.commentItems.isNotEmpty;
-    if (!hasServerComments && keepExistingIfEmpty) {
-      final current = _post;
-      if (current != null && current.commentItems.isNotEmpty) {
-        setState(() {
-          _post = serverPost.withComments(current.commentItems);
-        });
-        return;
-      }
-    }
+  void _applyServerPost(PostModel serverPost) {
+    final current = _post;
+    final retainedComments = current?.commentItems ?? const <PostCommentModel>[];
+    final hasServerCount = serverPost.commentItems.isNotEmpty || serverPost.comments > 0;
+    final nextCount = serverPost.commentItems.isNotEmpty
+        ? serverPost.commentItems.length
+        : hasServerCount
+            ? serverPost.comments
+            : retainedComments.length;
+    final mergedName = _isPlaceholderName(serverPost.authorName) && current != null
+        ? current.authorName
+        : serverPost.authorName;
+    final mergedAvatar = _preferNonEmpty(serverPost.authorAvatar, current?.authorAvatar);
+    final mergedUsername = _preferNonEmpty(serverPost.authorUsername, current?.authorUsername);
+    final next = serverPost.copyWith(
+      authorName: mergedName,
+      authorAvatar: mergedAvatar,
+      authorUsername: mergedUsername,
+      commentItems: retainedComments,
+      comments: nextCount,
+    );
+    setState(() => _post = next);
+  }
 
-    if (hasServerComments) {
-      final filtered = serverPost.commentItems
-          .where((comment) => !comment.id.startsWith(_optimisticPrefix))
-          .toList(growable: false);
-      setState(() => _post = serverPost.withComments(filtered));
-    } else {
-      setState(() => _post = serverPost);
+  void _applyRealtimeComments(List<PostCommentModel> comments) {
+    final post = _post;
+    if (post == null) {
+      return;
     }
+    _expireOptimisticWithSnapshot(comments);
+    final filtered = comments
+      .where((comment) => !comment.id.startsWith(_optimisticPrefix))
+      .toList(growable: false);
+
+    final currentConfirmed = post.commentItems
+      .where((comment) => !comment.id.startsWith(_optimisticPrefix))
+      .toList(growable: false);
+    final optimistic = post.commentItems
+      .where(
+        (comment) => comment.id.startsWith(_optimisticPrefix) &&
+          _pendingOptimisticIds.contains(comment.id),
+      )
+      .toList(growable: false);
+
+    final shouldReplace = filtered.length >= currentConfirmed.length;
+    final mergedConfirmed = _mergeCommentLists(
+      currentConfirmed,
+      filtered,
+      replace: shouldReplace,
+    );
+    final combined = _sortComments(<PostCommentModel>[...mergedConfirmed, ...optimistic]);
+    final updated = post
+      .withComments(combined)
+      .copyWith(comments: combined.length);
+    setState(() => _post = updated);
+    _hydrateComments(updated).then((hydrated) {
+      if (!mounted) return;
+      setState(() => _post = hydrated);
+    });
   }
 
   PostCommentModel _buildOptimisticComment(String text) {
-    final profile = _currentProfile;
+    ProfileModel? profile = _currentProfile;
+    final uid = _currentUserId;
+    if (profile == null && uid != null && uid.isNotEmpty) {
+      profile = _profileCache[uid];
+    }
     final rawName = profile?.name ?? '';
     final displayName = rawName.trim().isNotEmpty ? rawName.trim() : PostCommentModel.defaultAuthorName;
     return PostCommentModel(
       id: '$_optimisticPrefix${DateTime.now().microsecondsSinceEpoch}',
-      userId: _currentUserId ?? '',
+      userId: uid ?? '',
       text: text,
       createdAt: DateTime.now(),
       authorName: displayName,
@@ -244,15 +370,109 @@ class _CommentsViewState extends State<CommentsView> {
     );
   }
 
+  void _registerOptimisticComment(PostCommentModel comment) {
+    _pendingOptimisticIds.add(comment.id);
+    _optimisticFingerprints[comment.id] = _OptimisticFingerprint(
+      userId: comment.userId.trim(),
+      normalizedText: comment.text.trim().toLowerCase(),
+      createdAtMs: comment.createdAt?.millisecondsSinceEpoch,
+      toleranceMs: _optimisticMatchToleranceMs,
+    );
+  }
+
+  void _unregisterOptimisticComment(String commentId) {
+    _pendingOptimisticIds.remove(commentId);
+    _optimisticFingerprints.remove(commentId);
+  }
+
+  void _expireOptimisticWithSnapshot(List<PostCommentModel> comments) {
+    if (_pendingOptimisticIds.isEmpty || comments.isEmpty) {
+      return;
+    }
+    final confirmed = comments
+        .where((comment) => !comment.id.startsWith(_optimisticPrefix))
+        .toList(growable: false);
+    if (confirmed.isEmpty) {
+      return;
+    }
+    final idsToRemove = <String>{};
+    for (final optimisticId in _pendingOptimisticIds) {
+      final fingerprint = _optimisticFingerprints[optimisticId];
+      if (fingerprint == null) {
+        idsToRemove.add(optimisticId);
+        continue;
+      }
+      final matched = confirmed.any(fingerprint.matches);
+      if (matched) {
+        idsToRemove.add(optimisticId);
+      }
+    }
+    if (idsToRemove.isEmpty) {
+      return;
+    }
+    for (final id in idsToRemove) {
+      _unregisterOptimisticComment(id);
+    }
+  }
+
+  List<PostCommentModel> _sortComments(List<PostCommentModel> comments) {
+    final sorted = List<PostCommentModel>.from(comments);
+    sorted.sort((a, b) {
+      final aTime = a.createdAt?.millisecondsSinceEpoch ?? 0;
+      final bTime = b.createdAt?.millisecondsSinceEpoch ?? 0;
+      if (aTime != bTime) {
+        return aTime.compareTo(bTime);
+      }
+      return a.id.compareTo(b.id);
+    });
+    return sorted;
+  }
+
   PostModel? _removeCommentFromPost(String commentId) {
     final current = _post;
     if (current == null) {
       return current;
     }
+    _unregisterOptimisticComment(commentId);
     final updated = current.commentItems
         .where((comment) => comment.id != commentId)
         .toList(growable: false);
     return current.withComments(updated);
+  }
+
+  List<PostCommentModel> _mergeCommentLists(
+    List<PostCommentModel> current,
+    List<PostCommentModel> incoming, {
+    required bool replace,
+  }) {
+    if (replace) {
+      return _sortComments(incoming);
+    }
+    if (incoming.isEmpty) {
+      return _sortComments(current);
+    }
+    final Map<String, PostCommentModel> byId = {
+      for (final item in current) item.id: item,
+    };
+    for (final comment in incoming) {
+      byId[comment.id] = comment;
+    }
+    return _sortComments(byId.values.toList(growable: false));
+  }
+
+  bool _isPlaceholderName(String? name) {
+    if (name == null) {
+      return true;
+    }
+    final normalized = name.trim().toLowerCase();
+    return normalized.isEmpty || normalized == 'usuario upsglam';
+  }
+
+  String? _preferNonEmpty(String? primary, String? fallback) {
+    if (primary != null && primary.trim().isNotEmpty) {
+      return primary;
+    }
+    return fallback;
   }
 
   String _formatTimeAgo(DateTime? date) {

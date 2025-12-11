@@ -39,57 +39,21 @@ class RealtimePostStreamService {
   }
 
   Stream<PostModel?> watchPostById(String postId) {
-    if (!isAvailable) {
+    if (!isAvailable || postId.isEmpty) {
       return const Stream<PostModel?>.empty();
     }
 
     final docRef = _firestore.collection('posts').doc(postId);
-    final commentsQuery = docRef
-        .collection('comments')
-        .orderBy('createdAt', descending: false);
 
-    return Stream.multi((controller) {
-      DocumentSnapshot<Map<String, dynamic>>? latestDoc;
-      QuerySnapshot<Map<String, dynamic>>? latestComments;
-
-      void emitLatest() {
-        final doc = latestDoc;
-        if (doc == null || !doc.exists) {
-          controller.add(null);
-          return;
-        }
-        final normalized = _normalizePostData(
-          doc,
-          latestComments?.docs
-                  .map(_normalizeCommentData)
-                  .toList(growable: false),
-        );
-        try {
-          controller.add(PostModel.fromJson(normalized));
-        } catch (error, stackTrace) {
-          controller.addError(error, stackTrace);
-        }
+    return docRef.snapshots().map((snapshot) {
+      if (!snapshot.exists) {
+        return null;
       }
-
-      StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? postSub;
-      StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? commentsSub;
-
-      controller.onListen = () {
-        postSub = docRef.snapshots().listen((snapshot) {
-          latestDoc = snapshot;
-          emitLatest();
-        }, onError: controller.addError);
-
-        commentsSub = commentsQuery.snapshots().listen((snapshot) {
-          latestComments = snapshot;
-          emitLatest();
-        }, onError: controller.addError);
-      };
-
-      controller.onCancel = () async {
-        await postSub?.cancel();
-        await commentsSub?.cancel();
-      };
+      final normalized = _normalizePostData(snapshot);
+      return PostModel.fromJson(normalized);
+    }).handleError((error, stackTrace) {
+      debugPrint('Realtime post error: $error');
+      debugPrintStack(label: 'Realtime post stack', stackTrace: stackTrace);
     });
   }
 
@@ -132,16 +96,6 @@ class RealtimePostStreamService {
     }
 
     return normalized;
-  }
-
-  Map<String, dynamic> _normalizeCommentData(
-    QueryDocumentSnapshot<Map<String, dynamic>> doc,
-  ) {
-    final map = <String, dynamic>{
-      ..._sanitizeMap(doc.data()),
-    };
-    map.putIfAbsent('id', () => doc.id);
-    return map;
   }
 
   Map<String, dynamic> _sanitizeMap(Map<String, dynamic> raw) {
