@@ -662,27 +662,31 @@ class _PostCard extends StatelessWidget {
           const SizedBox(height: 16),
           ClipRRect(
             borderRadius: BorderRadius.circular(22),
-            child: Image.network(
-              post.imageUrl,
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Container(
-                  height: 300,
+            child: SizedBox(
+              height: 400,
+              width: double.infinity,
+              child: Image.network(
+                post.imageUrl,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Container(
+                    height: 400,
+                    width: double.infinity,
+                    color: Colors.black12,
+                    child: const Center(child: CircularProgressIndicator()),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) => Container(
+                  height: 400,
                   width: double.infinity,
-                  color: Colors.black12,
-                  child: const Center(child: CircularProgressIndicator()),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) => Container(
-                height: 300,
-                width: double.infinity,
-                color: Colors.black26,
-                child: const Center(
-                  child: Icon(
-                    Icons.broken_image_outlined,
-                    size: 48,
-                    color: Colors.white38,
+                  color: Colors.black26,
+                  child: const Center(
+                    child: Icon(
+                      Icons.broken_image_outlined,
+                      size: 48,
+                      color: Colors.white38,
+                    ),
                   ),
                 ),
               ),
