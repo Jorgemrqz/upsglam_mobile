@@ -688,38 +688,77 @@ class _PostCard extends StatelessWidget {
               ),
             ),
           ),
-          if (post.content != null && post.content!.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Text(post.content!, style: textTheme.bodyMedium),
-          ],
-          if (chips.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Wrap(spacing: 12, children: chips),
-          ],
-          const SizedBox(height: 12),
+
+          // Action Bar: Iconos a la izquierda
           Row(
             children: [
               IconButton(
                 icon: liking
                     ? const SizedBox(
-                        width: 20,
-                        height: 20,
+                        width: 24,
+                        height: 24,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : Icon(
                         liked ? Icons.favorite : Icons.favorite_border,
                         color: liked ? Colors.pinkAccent : null,
+                        size: 28,
                       ),
                 onPressed: liking ? null : onToggleLike,
               ),
-              const SizedBox(width: 4),
-              Text('${post.likes}'),
-              const Spacer(),
-              TextButton(
+              IconButton(
+                icon: const Icon(Icons.chat_bubble_outline, size: 26),
                 onPressed: onOpenComments,
-                child: Text('Comentarios (${post.comments})'),
               ),
             ],
+          ),
+          // Contadores y Likes
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (post.likes > 0)
+                  Text(
+                    '${post.likes} Me gusta',
+                    style: textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  )
+                else
+                  Text(
+                    'Sé el primero en dar like',
+                    style: textTheme.bodySmall?.copyWith(color: Colors.white54),
+                  ),
+                const SizedBox(height: 6),
+                // Descripción formato: Usuario + Texto
+                if (post.content != null && post.content!.isNotEmpty)
+                  RichText(
+                    text: TextSpan(
+                      style: textTheme.bodyMedium,
+                      children: [
+                        TextSpan(
+                          text: '${post.authorName} ',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        TextSpan(text: post.content),
+                      ],
+                    ),
+                  ),
+                if (post.comments > 0) ...[
+                  const SizedBox(height: 4),
+                  GestureDetector(
+                    onTap: onOpenComments,
+                    child: Text(
+                      'Ver los ${post.comments} comentarios',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: Colors.white54,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ],
       ),
