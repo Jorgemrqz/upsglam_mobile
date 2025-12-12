@@ -12,6 +12,7 @@ import 'package:upsglam_mobile/views/create_post/select_image_view.dart';
 import 'package:upsglam_mobile/views/feed/comments_view.dart';
 import 'package:upsglam_mobile/views/profile/profile_view.dart';
 
+import 'package:upsglam_mobile/views/search/user_search_view.dart';
 import 'package:upsglam_mobile/widgets/glass_panel.dart';
 import 'package:upsglam_mobile/widgets/upsglam_background.dart';
 
@@ -457,6 +458,11 @@ class _FeedViewState extends State<FeedView> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () =>
+                Navigator.pushNamed(context, UserSearchView.routeName),
+          ),
+          IconButton(
             icon: const Icon(Icons.person_outline),
             onPressed: () =>
                 Navigator.pushNamed(context, ProfileView.routeName),
@@ -706,9 +712,22 @@ class _PostCard extends StatelessWidget {
                       ),
                 onPressed: liking ? null : onToggleLike,
               ),
+              Text(
+                '${post.likes}',
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(width: 8),
               IconButton(
                 icon: const Icon(Icons.chat_bubble_outline, size: 26),
                 onPressed: onOpenComments,
+              ),
+              Text(
+                '${post.comments}',
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
@@ -718,22 +737,10 @@ class _PostCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (post.likes > 0)
-                  Text(
-                    '${post.likes} Me gusta',
-                    style: textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  )
-                else
-                  Text(
-                    'Sé el primero en dar like',
-                    style: textTheme.bodySmall?.copyWith(color: Colors.white54),
-                  ),
-                const SizedBox(height: 6),
                 // Descripción formato: Usuario + Texto
                 if (post.content != null && post.content!.isNotEmpty)
                   RichText(
+                    textAlign: TextAlign.justify,
                     text: TextSpan(
                       style: textTheme.bodyMedium,
                       children: [
@@ -745,6 +752,16 @@ class _PostCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                if (chips.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: chips
+                        .map((c) => Transform.scale(scale: 0.85, child: c))
+                        .toList(),
+                  ),
+                ],
                 if (post.comments > 0) ...[
                   const SizedBox(height: 4),
                   GestureDetector(

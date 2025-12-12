@@ -5,6 +5,7 @@ import 'package:upsglam_mobile/models/post.dart';
 import 'package:upsglam_mobile/models/profile.dart';
 import 'package:upsglam_mobile/services/auth_service.dart';
 import 'package:upsglam_mobile/services/post_service.dart';
+import 'package:upsglam_mobile/services/user_service.dart';
 import 'package:upsglam_mobile/theme/upsglam_theme.dart';
 import 'package:upsglam_mobile/views/auth/login_view.dart';
 import 'package:upsglam_mobile/views/feed/post_detail_view.dart';
@@ -25,8 +26,13 @@ class ProfileView extends StatefulWidget {
 class _ProfileViewState extends State<ProfileView> {
   final AuthService _authService = AuthService.instance;
   final PostService _postService = PostService.instance;
+  final UserService _userService = UserService.instance;
 
   ProfileModel? _profile;
+  bool _isMe = false;
+  bool _isFollowing = false;
+  bool _followLoading = false;
+
   List<PostModel> _userPosts = [];
   bool _postsLoading = false;
 
@@ -34,12 +40,37 @@ class _ProfileViewState extends State<ProfileView> {
   bool _loading = true;
 
   @override
-  void initState() {
-    super.initState();
-    _loadProfile();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_profile == null) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is ProfileModel) {
+        _initializeWithUser(args);
+      } else {
+        _loadMyProfile();
+      }
+    }
   }
 
-  Future<void> _loadProfile() async {
+  Future<void> _initializeWithUser(ProfileModel user) async {
+    setState(() => _loading = true);
+    final myProfile = await _authService.getStoredProfile();
+    final isMe = myProfile?.id == user.id;
+
+    if (!mounted) return;
+    setState(() {
+      _profile = user;
+      _isMe = isMe;
+      _loading = false;
+    });
+
+    _loadUserPosts(user.id);
+    if (!isMe && myProfile != null) {
+      _checkIfFollowing(user.id, myProfile.id);
+    }
+  }
+
+  Future<void> _loadMyProfile() async {
     setState(() => _loading = true);
     final profile = await _authService.getStoredProfile();
     final email = await _authService.getStoredEmail();
@@ -47,11 +78,47 @@ class _ProfileViewState extends State<ProfileView> {
     setState(() {
       _profile = profile;
       _email = email;
+      _isMe = true;
       _loading = false;
     });
 
     if (profile != null) {
       _loadUserPosts(profile.id);
+    }
+  }
+
+  Future<void> _checkIfFollowing(String targetId, String myId) async {
+    try {
+      final following = await _userService.getFollowingIds(myId);
+      if (!mounted) return;
+      setState(() {
+        _isFollowing = following.contains(targetId);
+      });
+    } catch (_) {
+      // Ignorar errores de carga inicial de follow status
+    }
+  }
+
+  Future<void> _toggleFollow() async {
+    if (_profile == null || _followLoading) return;
+    setState(() => _followLoading = true);
+    try {
+      if (_isFollowing) {
+        await _userService.unfollowUser(_profile!.id);
+      } else {
+        await _userService.followUser(_profile!.id);
+      }
+      if (!mounted) return;
+      setState(() {
+        _isFollowing = !_isFollowing;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error al actualizar seguimiento')),
+      );
+    } finally {
+      if (mounted) setState(() => _followLoading = false);
     }
   }
 
@@ -65,7 +132,7 @@ class _ProfileViewState extends State<ProfileView> {
         _userPosts = posts;
       });
     } catch (_) {
-      // Manejo silencioso o snackbar
+      // Manejo silencioso
     } finally {
       if (mounted) {
         setState(() => _postsLoading = false);
@@ -102,21 +169,24 @@ class _ProfileViewState extends State<ProfileView> {
     final textTheme = Theme.of(context).textTheme;
     final primary = UPSGlamTheme.primary;
     final accent = UPSGlamTheme.accent;
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text('Perfil de usuario'),
+        title: Text(_isMe ? 'Perfil de usuario' : (_profile?.username ?? '')),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () =>
-                Navigator.pushNamed(context, SettingsView.routeName),
-          ),
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            onPressed: _profile == null ? null : _openEditProfile,
-          ),
+          if (_isMe) ...[
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              onPressed: () =>
+                  Navigator.pushNamed(context, SettingsView.routeName),
+            ),
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: _profile == null ? null : _openEditProfile,
+            ),
+          ],
           const SizedBox(width: 8),
         ],
       ),
@@ -146,6 +216,25 @@ class _ProfileViewState extends State<ProfileView> {
         children: [
           _buildHeader(profile, textTheme, primary, accent),
           const SizedBox(height: 18),
+          if (!_isMe)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: FilledButton(
+                onPressed: _toggleFollow,
+                style: FilledButton.styleFrom(
+                  backgroundColor: _isFollowing ? Colors.white24 : primary,
+                  foregroundColor: Colors.white,
+                ),
+                child: _followLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(_isFollowing ? 'Dejar de seguir' : 'Seguir'),
+              ),
+            ),
+          if (!_isMe) const SizedBox(height: 18),
           _buildDetails(profile, textTheme),
           const SizedBox(height: 18),
           if (profile.avatarHistory.isNotEmpty)
@@ -155,11 +244,13 @@ class _ProfileViewState extends State<ProfileView> {
           const SizedBox(height: 24),
           _buildUserPostsGrid(textTheme),
           const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: _logout,
-            icon: const Icon(Icons.logout),
-            label: const Text('Cerrar sesión'),
-          ),
+          if (_isMe)
+            FilledButton.icon(
+              onPressed: _logout,
+              icon: const Icon(Icons.logout),
+              label: const Text('Cerrar sesión'),
+            ),
+          const SizedBox(height: 32),
         ],
       ),
     );
@@ -205,11 +296,10 @@ class _ProfileViewState extends State<ProfileView> {
                         color: Colors.white70,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _email ?? 'Correo no disponible',
-                      style: textTheme.bodySmall,
-                    ),
+                    if (_isMe && _email != null) ...[
+                      const SizedBox(height: 4),
+                      Text(_email!, style: textTheme.bodySmall),
+                    ],
                   ],
                 ),
               ),
@@ -219,7 +309,9 @@ class _ProfileViewState extends State<ProfileView> {
           Text(
             profile.bio?.isNotEmpty == true
                 ? profile.bio!
-                : 'Comparte tus resultados WebFlux + GPU con la comunidad.',
+                : (_isMe
+                      ? 'Comparte tus resultados WebFlux + GPU con la comunidad.'
+                      : 'Sin biografía.'),
             style: textTheme.bodyMedium,
           ),
           const SizedBox(height: 12),
@@ -242,24 +334,18 @@ class _ProfileViewState extends State<ProfileView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Detalles de la cuenta', style: textTheme.titleMedium),
+          Text('Detalles', style: textTheme.titleMedium),
           const SizedBox(height: 16),
           _ProfileDetailRow(
             icon: Icons.event_available,
-            label: 'Creado',
+            label: 'Se unió',
             value: _formatDate(profile.createdAt),
           ),
           const SizedBox(height: 12),
           _ProfileDetailRow(
             icon: Icons.person_outline,
-            label: 'Nombre',
+            label: 'Nombre completo',
             value: profile.name,
-          ),
-          const SizedBox(height: 12),
-          _ProfileDetailRow(
-            icon: Icons.alternate_email_outlined,
-            label: 'Usuario',
-            value: '@${profile.username}',
           ),
         ],
       ),
@@ -271,7 +357,7 @@ class _ProfileViewState extends State<ProfileView> {
       try {
         return MemoryImage(base64Decode(profile.avatarData!));
       } catch (_) {
-        // ignore and fallback to URL/initials
+        // ignore
       }
     }
     if (profile.avatarUrl?.isNotEmpty == true) {
@@ -316,7 +402,9 @@ class _ProfileViewState extends State<ProfileView> {
           Text(
             profile.bio?.isNotEmpty == true
                 ? profile.bio!
-                : 'Aún no has configurado una bio. Personaliza tu historia desde la web.',
+                : (_isMe
+                      ? 'Aún no has configurado una bio.'
+                      : 'Sin biografía disponible.'),
             style: textTheme.bodyMedium,
           ),
         ],
@@ -335,22 +423,14 @@ class _ProfileViewState extends State<ProfileView> {
             children: [
               const Icon(Icons.person_off_outlined, size: 48),
               const SizedBox(height: 16),
-              Text(
-                'Aún no hay un perfil vinculado',
-                style: textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Inicia sesión nuevamente para sincronizar tu perfil del backend.',
-                textAlign: TextAlign.center,
-                style: textTheme.bodyMedium?.copyWith(color: Colors.white70),
-              ),
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: _logout,
-                icon: const Icon(Icons.login_outlined),
-                label: const Text('Volver a iniciar sesión'),
-              ),
+              Text('Perfil no encontrado', style: textTheme.titleMedium),
+              if (_isMe) ...[
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: _logout,
+                  child: const Text('Volver a iniciar sesión'),
+                ),
+              ],
             ],
           ),
         ),
@@ -375,7 +455,7 @@ class _ProfileViewState extends State<ProfileView> {
                 color: Colors.white54,
               ),
               const SizedBox(height: 12),
-              Text('Aún no tienes publicaciones', style: textTheme.bodyLarge),
+              Text('No hay publicaciones', style: textTheme.bodyLarge),
             ],
           ),
         ),
@@ -401,8 +481,7 @@ class _ProfileViewState extends State<ProfileView> {
               PostDetailView.routeName,
               arguments: post,
             ).then((deleted) {
-              if (deleted == true) {
-                // Si el post fue eliminado, recargamos la lista
+              if (deleted == true && _isMe) {
                 if (_profile != null) _loadUserPosts(_profile!.id);
               }
             });

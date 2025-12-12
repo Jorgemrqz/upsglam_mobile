@@ -11,6 +11,7 @@ import 'package:upsglam_mobile/views/feed/feed_view.dart';
 import 'package:upsglam_mobile/views/feed/post_detail_view.dart';
 import 'package:upsglam_mobile/views/profile/edit_profile_view.dart';
 import 'package:upsglam_mobile/views/profile/profile_view.dart';
+import 'package:upsglam_mobile/views/search/user_search_view.dart';
 import 'package:upsglam_mobile/views/settings/settings_view.dart';
 import 'package:upsglam_mobile/views/setup/gateway_setup_view.dart';
 
@@ -46,6 +47,8 @@ class AppRouter {
         return _material(const GatewaySetupView());
       case PostDetailView.routeName:
         return _material(const PostDetailView(), settings);
+      case UserSearchView.routeName:
+        return _material(const UserSearchView(), settings);
       default:
         return _material(const SplashScreen());
     }
