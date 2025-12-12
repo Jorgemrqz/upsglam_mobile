@@ -653,10 +653,6 @@ class _PostCard extends StatelessWidget {
                     ),
                   ],
                 ),
-              IconButton(
-                icon: const Icon(Icons.chat_bubble_outline),
-                onPressed: onOpenComments,
-              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -718,11 +714,6 @@ class _PostCard extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Text('${post.likes}'),
-              const SizedBox(width: 16),
-              IconButton(
-                icon: const Icon(Icons.share_outlined),
-                onPressed: () {},
-              ),
               const Spacer(),
               TextButton(
                 onPressed: onOpenComments,
