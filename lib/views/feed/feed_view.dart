@@ -7,7 +7,7 @@ import 'package:upsglam_mobile/models/profile.dart';
 import 'package:upsglam_mobile/services/post_service.dart';
 import 'package:upsglam_mobile/services/auth_service.dart';
 import 'package:upsglam_mobile/services/realtime_post_stream_service.dart';
-import 'package:upsglam_mobile/theme/upsglam_theme.dart';
+
 import 'package:upsglam_mobile/views/create_post/select_image_view.dart';
 import 'package:upsglam_mobile/views/feed/comments_view.dart';
 import 'package:upsglam_mobile/views/profile/profile_view.dart';
@@ -425,8 +425,6 @@ class _FeedViewState extends State<FeedView> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final primary = UPSGlamTheme.primary;
-    final accent = UPSGlamTheme.accent;
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
@@ -469,34 +467,6 @@ class _FeedViewState extends State<FeedView> {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: Column(
           children: [
-            SizedBox(
-              height: 86,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: 10,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                separatorBuilder: (context, index) => const SizedBox(width: 14),
-                itemBuilder: (context, index) => Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(colors: [accent, primary]),
-                      ),
-                      child: CircleAvatar(
-                        radius: 26,
-                        backgroundColor: Colors.black,
-                        child: Text('U${index + 1}'),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text('Lab ${index + 1}', style: textTheme.labelSmall),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
             Expanded(
               child: RefreshIndicator(
                 onRefresh: _refreshFeed,
