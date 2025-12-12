@@ -10,6 +10,7 @@ import 'package:upsglam_mobile/theme/upsglam_theme.dart';
 import 'package:upsglam_mobile/views/auth/login_view.dart';
 import 'package:upsglam_mobile/views/feed/post_detail_view.dart';
 import 'package:upsglam_mobile/views/profile/edit_profile_view.dart';
+import 'package:upsglam_mobile/views/profile/user_list_view.dart';
 import 'package:upsglam_mobile/views/settings/settings_view.dart';
 import 'package:upsglam_mobile/widgets/glass_panel.dart';
 import 'package:upsglam_mobile/widgets/upsglam_background.dart';
@@ -35,6 +36,9 @@ class _ProfileViewState extends State<ProfileView> {
 
   List<PostModel> _userPosts = [];
   bool _postsLoading = false;
+
+  Set<String> _followers = {};
+  Set<String> _following = {};
 
   String? _email;
   bool _loading = true;
@@ -65,6 +69,7 @@ class _ProfileViewState extends State<ProfileView> {
     });
 
     _loadUserPosts(user.id);
+    _loadFollowCounts(user.id);
     if (!isMe && myProfile != null) {
       _checkIfFollowing(user.id, myProfile.id);
     }
@@ -84,6 +89,21 @@ class _ProfileViewState extends State<ProfileView> {
 
     if (profile != null) {
       _loadUserPosts(profile.id);
+      _loadFollowCounts(profile.id);
+    }
+  }
+
+  Future<void> _loadFollowCounts(String userId) async {
+    try {
+      final followers = await _userService.getFollowerIds(userId);
+      final following = await _userService.getFollowingIds(userId);
+      if (!mounted) return;
+      setState(() {
+        _followers = followers;
+        _following = following;
+      });
+    } catch (_) {
+      // ignore
     }
   }
 
@@ -95,7 +115,7 @@ class _ProfileViewState extends State<ProfileView> {
         _isFollowing = following.contains(targetId);
       });
     } catch (_) {
-      // Ignorar errores de carga inicial de follow status
+      // ignore
     }
   }
 
@@ -112,6 +132,7 @@ class _ProfileViewState extends State<ProfileView> {
       setState(() {
         _isFollowing = !_isFollowing;
       });
+      _loadFollowCounts(_profile!.id);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -132,7 +153,7 @@ class _ProfileViewState extends State<ProfileView> {
         _userPosts = posts;
       });
     } catch (_) {
-      // Manejo silencioso
+      // ignore
     } finally {
       if (mounted) {
         setState(() => _postsLoading = false);
@@ -162,6 +183,15 @@ class _ProfileViewState extends State<ProfileView> {
       setState(() => _profile = result);
       await _authService.cacheProfile(result);
     }
+  }
+
+  void _openUserList(String title, Set<String> ids) {
+    if (ids.isEmpty) return;
+    Navigator.pushNamed(
+      context,
+      UserListView.routeName,
+      arguments: {'title': title, 'userIds': ids},
+    );
   }
 
   @override
@@ -216,6 +246,7 @@ class _ProfileViewState extends State<ProfileView> {
         children: [
           _buildHeader(profile, textTheme, primary, accent),
           const SizedBox(height: 18),
+
           if (!_isMe)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -235,15 +266,19 @@ class _ProfileViewState extends State<ProfileView> {
               ),
             ),
           if (!_isMe) const SizedBox(height: 18),
+
           _buildDetails(profile, textTheme),
           const SizedBox(height: 18),
+
           if (profile.avatarHistory.isNotEmpty)
             _buildAvatarHistory(profile, textTheme)
           else
             _buildBioPanel(profile, textTheme),
+
           const SizedBox(height: 24),
           _buildUserPostsGrid(textTheme),
           const SizedBox(height: 24),
+
           if (_isMe)
             FilledButton.icon(
               onPressed: _logout,
@@ -306,6 +341,30 @@ class _ProfileViewState extends State<ProfileView> {
             ],
           ),
           const SizedBox(height: 16),
+          // Estadísticas integradas
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildStatItem(
+                'Publicaciones',
+                '${_userPosts.length}',
+                textTheme,
+              ),
+              _buildStatItem(
+                'Seguidores',
+                '${_followers.length}',
+                textTheme,
+                onTap: () => _openUserList('Seguidores', _followers),
+              ),
+              _buildStatItem(
+                'Seguidos',
+                '${_following.length}',
+                textTheme,
+                onTap: () => _openUserList('Seguidos', _following),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
           Text(
             profile.bio?.isNotEmpty == true
                 ? profile.bio!
@@ -322,6 +381,29 @@ class _ProfileViewState extends State<ProfileView> {
               accent: accent,
               textTheme: textTheme,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(
+    String label,
+    String value,
+    TextTheme textTheme, {
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          Text(
+            label,
+            style: textTheme.bodySmall?.copyWith(color: Colors.white70),
           ),
         ],
       ),

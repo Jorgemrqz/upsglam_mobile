@@ -143,4 +143,27 @@ class UserService {
       return {};
     }
   }
+
+  Future<Set<String>> getFollowerIds(String userId) async {
+    await ApiConfig.ensureInitialized();
+    final uri = ApiConfig.uriFor('/users/$userId/followers');
+    final token = await _authService.getStoredAccessToken();
+    final headers = {
+      if (token != null) HttpHeaders.authorizationHeader: 'Bearer $token',
+    };
+
+    try {
+      final response = await _client.get(uri, headers: headers);
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        final list = decoded['followers'] as List?;
+        if (list != null) {
+          return list.map((e) => e.toString()).toSet();
+        }
+      }
+      return {};
+    } catch (_) {
+      return {};
+    }
+  }
 }
