@@ -90,6 +90,8 @@ class PostService {
   Future<PostModel> createPost({
     required String imageUrl,
     String? content,
+    String? filter,
+    int? mask,
   }) async {
     await ApiConfig.ensureInitialized();
     final token = await _authService.getStoredAccessToken();
@@ -98,9 +100,17 @@ class PostService {
     }
 
     final payload = <String, dynamic>{'imageUrl': imageUrl.trim()};
-    final trimmedContent = content?.trim();
-    if (trimmedContent != null && trimmedContent.isNotEmpty) {
-      payload['content'] = trimmedContent;
+
+    // Inyectamos la metadata en el contenido si existe
+    var finalContent = content?.trim() ?? '';
+    if (filter != null || mask != null) {
+      final metaString =
+          '\n\n<METADATA:v1|filter=${filter ?? ''}|mask=${mask ?? ''}>';
+      finalContent += metaString;
+    }
+
+    if (finalContent.isNotEmpty) {
+      payload['content'] = finalContent;
     }
 
     final uri = ApiConfig.uriFor('/posts');

@@ -44,6 +44,8 @@ class _PublishPostViewState extends State<PublishPostView> {
       final post = await _postService.createPost(
         imageUrl: args.processedImageUrl,
         content: _contentController.text,
+        filter: args.selectedFilter,
+        mask: args.maskValue,
       );
       if (!mounted) return;
       Navigator.pop(context, post);

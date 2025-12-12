@@ -37,6 +37,22 @@ class PostModel {
     final likeUsers = _parseStringList(json['likes']);
     final comments = PostCommentModel.listFrom(json['comments']);
 
+    // Procesar contenido para extraer metadata oculta
+    String? rawContent = (json['content'] as String?)?.trim();
+    String? matchedFilter = (json['filter'] as String?)?.trim();
+    String? matchedMask = (json['mask'] as String?)?.trim();
+
+    if (rawContent != null) {
+      final metaRegex = RegExp(r'<METADATA:v1\|filter=([^|]*)\|mask=([^|>]*)>');
+      final match = metaRegex.firstMatch(rawContent);
+      if (match != null) {
+        matchedFilter = match.group(1);
+        matchedMask = match.group(2);
+        // Limpiamos el contenido visible
+        rawContent = rawContent.replaceAll(match.group(0)!, '').trim();
+      }
+    }
+
     return PostModel(
       id: (json['id'] as String?) ?? (json['postId'] as String?) ?? '',
       imageUrl: () {
@@ -46,21 +62,26 @@ class PostModel {
         }
         return 'https://via.placeholder.com/600x400?text=UPSGlam';
       }(),
-      content: (json['content'] as String?)?.trim(),
+      content: rawContent?.isEmpty == true ? null : rawContent,
       authorName: (json['authorName'] as String?)?.trim() ?? 'Usuario UPSGlam',
       authorUsername: (json['authorUsername'] as String?)?.trim(),
       authorAvatar: _resolveAuthorAvatar(json),
-        likes: _extractCount(json['likeCount']) ??
-          (likeUsers != null ? likeUsers.length : _extractCount(json['likes'])) ??
+      likes:
+          _extractCount(json['likeCount']) ??
+          (likeUsers != null
+              ? likeUsers.length
+              : _extractCount(json['likes'])) ??
           0,
-        comments: comments.isNotEmpty
+      comments: comments.isNotEmpty
           ? comments.length
-          : _extractCount(json['comments']) ?? _extractCount(json['commentCount']) ?? 0,
-      filter: (json['filter'] as String?)?.trim(),
-      mask: (json['mask'] as String?)?.trim(),
+          : _extractCount(json['comments']) ??
+                _extractCount(json['commentCount']) ??
+                0,
+      filter: matchedFilter,
+      mask: matchedMask,
       createdAt: _parseDate(json['createdAt']),
       userId: (json['userId'] as String?)?.trim(),
-        commentItems: List.unmodifiable(comments),
+      commentItems: List.unmodifiable(comments),
       likedByUserIds: likeUsers ?? const <String>[],
     );
   }
@@ -113,10 +134,11 @@ class PostModel {
     } else {
       updatedIds.removeWhere((id) => id == userId);
     }
-    final newLikes = like
-        ? likes + 1
-        : (likes > 0 ? likes - 1 : 0);
-    return copyWith(likes: newLikes, likedByUserIds: List.unmodifiable(updatedIds));
+    final newLikes = like ? likes + 1 : (likes > 0 ? likes - 1 : 0);
+    return copyWith(
+      likes: newLikes,
+      likedByUserIds: List.unmodifiable(updatedIds),
+    );
   }
 
   PostModel withComments(List<PostCommentModel> comments) {
@@ -178,7 +200,10 @@ class PostModel {
 
   static List<PostModel> listFrom(dynamic raw) {
     if (raw is List) {
-      return raw.whereType<Map<String, dynamic>>().map(PostModel.fromJson).toList();
+      return raw
+          .whereType<Map<String, dynamic>>()
+          .map(PostModel.fromJson)
+          .toList();
     }
     if (raw is Map<String, dynamic> && raw['data'] is List) {
       return (raw['data'] as List)
