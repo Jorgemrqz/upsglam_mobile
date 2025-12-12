@@ -16,7 +16,8 @@ class PostException implements Exception {
   final int? statusCode;
 
   @override
-  String toString() => 'PostException(statusCode: $statusCode, message: $message)';
+  String toString() =>
+      'PostException(statusCode: $statusCode, message: $message)';
 }
 
 class PostService {
@@ -39,7 +40,44 @@ class PostService {
         return _parsePosts(response.body);
       }
       throw PostException(
-        _extractMessage(response.body) ?? 'No se pudo cargar el feed (${response.statusCode})',
+        _extractMessage(response.body) ??
+            'No se pudo cargar el feed (${response.statusCode})',
+        statusCode: response.statusCode,
+      );
+    } on SocketException {
+      throw const PostException('No se pudo conectar con el API Gateway');
+    } on TimeoutException {
+      throw const PostException('El API Gateway tardó demasiado en responder');
+    }
+  }
+
+  Future<List<PostModel>> fetchPostsByUser(String userId) async {
+    await ApiConfig.ensureInitialized();
+    final uri = ApiConfig.uriFor('/posts/user/$userId');
+    final headers = await _authorizedHeaders(optional: true);
+    try {
+      print('DEBUG: Calling GET $uri');
+      final response = await _client
+          .get(uri, headers: headers)
+          .timeout(ApiConfig.defaultTimeout);
+
+      print('DEBUG: Response ${response.statusCode}');
+      print('DEBUG: Body ${response.body}');
+
+      developer.log(
+        'GET /posts/user/$userId => ${response.statusCode}',
+        name: 'PostService',
+        error: response.body.length > 500
+            ? response.body.substring(0, 500)
+            : response.body,
+      );
+
+      if (response.statusCode == 200) {
+        return _parsePosts(response.body);
+      }
+      throw PostException(
+        _extractMessage(response.body) ??
+            'No se pudo cargar los posts del usuario (${response.statusCode})',
         statusCode: response.statusCode,
       );
     } on SocketException {
@@ -93,7 +131,8 @@ class PostService {
       }
 
       throw PostException(
-        _extractMessage(response.body) ?? 'No se pudo crear el post (${response.statusCode})',
+        _extractMessage(response.body) ??
+            'No se pudo crear el post (${response.statusCode})',
         statusCode: response.statusCode,
       );
     } on SocketException {
@@ -103,19 +142,16 @@ class PostService {
     }
   }
 
-  Future<Map<String, String>> _authorizedHeaders({bool optional = false}) async {
-    final base = <String, String>{
-      HttpHeaders.acceptHeader: 'application/json',
-    };
+  Future<Map<String, String>> _authorizedHeaders({
+    bool optional = false,
+  }) async {
+    final base = <String, String>{HttpHeaders.acceptHeader: 'application/json'};
     final token = await _authService.getStoredAccessToken();
     if (token == null || token.isEmpty) {
       if (optional) return base;
       throw const PostException('Sin credenciales válidas');
     }
-    return {
-      ...base,
-      HttpHeaders.authorizationHeader: 'Bearer $token',
-    };
+    return {...base, HttpHeaders.authorizationHeader: 'Bearer $token'};
   }
 
   List<PostModel> _parsePosts(String body) {
@@ -128,7 +164,8 @@ class PostService {
         if (decoded['posts'] is List) {
           return PostModel.listFrom(decoded['posts']);
         }
-        if (decoded['data'] is List || decoded['data'] is Map<String, dynamic>) {
+        if (decoded['data'] is List ||
+            decoded['data'] is Map<String, dynamic>) {
           return PostModel.listFrom(decoded['data']);
         }
         return [PostModel.fromJson(decoded)];
@@ -153,7 +190,8 @@ class PostService {
 
   Future<PostModel> likePost(String postId) => _mutateLike(postId, like: true);
 
-  Future<PostModel> unlikePost(String postId) => _mutateLike(postId, like: false);
+  Future<PostModel> unlikePost(String postId) =>
+      _mutateLike(postId, like: false);
 
   Future<PostModel> fetchPostById(String postId) async {
     await ApiConfig.ensureInitialized();
@@ -170,7 +208,8 @@ class PostService {
         );
       }
       throw PostException(
-        _extractMessage(response.body) ?? 'No se pudo obtener el post (${response.statusCode})',
+        _extractMessage(response.body) ??
+            'No se pudo obtener el post (${response.statusCode})',
         statusCode: response.statusCode,
       );
     } on SocketException {
@@ -209,7 +248,8 @@ class PostService {
       }
 
       throw PostException(
-        _extractMessage(response.body) ?? 'No se pudo enviar el comentario (${response.statusCode})',
+        _extractMessage(response.body) ??
+            'No se pudo enviar el comentario (${response.statusCode})',
         statusCode: response.statusCode,
       );
     } on SocketException {
@@ -224,10 +264,11 @@ class PostService {
     final headers = await _authorizedHeaders();
     final uri = ApiConfig.uriFor('/posts/$postId/likes');
     try {
-      final response = await (like
-              ? _client.post(uri, headers: headers)
-              : _client.delete(uri, headers: headers))
-          .timeout(ApiConfig.defaultTimeout);
+      final response =
+          await (like
+                  ? _client.post(uri, headers: headers)
+                  : _client.delete(uri, headers: headers))
+              .timeout(ApiConfig.defaultTimeout);
 
       if (response.statusCode == 200) {
         return _parsePostFromBody(
@@ -259,11 +300,7 @@ class PostService {
     final body = <String, dynamic>{'content': content?.trim() ?? ''};
     try {
       final response = await _client
-          .put(
-            uri,
-            headers: payloadHeaders,
-            body: jsonEncode(body),
-          )
+          .put(uri, headers: payloadHeaders, body: jsonEncode(body))
           .timeout(ApiConfig.defaultTimeout);
 
       if (response.statusCode == 200) {
@@ -274,7 +311,8 @@ class PostService {
       }
 
       throw PostException(
-        _extractMessage(response.body) ?? 'No se pudo editar el post (${response.statusCode})',
+        _extractMessage(response.body) ??
+            'No se pudo editar el post (${response.statusCode})',
         statusCode: response.statusCode,
       );
     } on SocketException {
@@ -298,7 +336,8 @@ class PostService {
       }
 
       throw PostException(
-        _extractMessage(response.body) ?? 'No se pudo eliminar el post (${response.statusCode})',
+        _extractMessage(response.body) ??
+            'No se pudo eliminar el post (${response.statusCode})',
         statusCode: response.statusCode,
       );
     } on SocketException {

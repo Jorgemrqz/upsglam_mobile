@@ -1,8 +1,10 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:upsglam_mobile/models/post.dart';
 import 'package:upsglam_mobile/models/profile.dart';
 import 'package:upsglam_mobile/services/auth_service.dart';
+import 'package:upsglam_mobile/services/post_service.dart';
 import 'package:upsglam_mobile/theme/upsglam_theme.dart';
 import 'package:upsglam_mobile/views/auth/login_view.dart';
 import 'package:upsglam_mobile/views/profile/edit_profile_view.dart';
@@ -20,8 +22,12 @@ class ProfileView extends StatefulWidget {
 
 class _ProfileViewState extends State<ProfileView> {
   final AuthService _authService = AuthService.instance;
+  final PostService _postService = PostService.instance;
 
   ProfileModel? _profile;
+  List<PostModel> _userPosts = [];
+  bool _postsLoading = false;
+
   String? _email;
   bool _loading = true;
 
@@ -41,12 +47,38 @@ class _ProfileViewState extends State<ProfileView> {
       _email = email;
       _loading = false;
     });
+
+    if (profile != null) {
+      _loadUserPosts(profile.id);
+    }
+  }
+
+  Future<void> _loadUserPosts(String userId) async {
+    if (!mounted) return;
+    setState(() => _postsLoading = true);
+    try {
+      final posts = await _postService.fetchPostsByUser(userId);
+      if (!mounted) return;
+      setState(() {
+        _userPosts = posts;
+      });
+    } catch (_) {
+      // Manejo silencioso o snackbar
+    } finally {
+      if (mounted) {
+        setState(() => _postsLoading = false);
+      }
+    }
   }
 
   Future<void> _logout() async {
     await _authService.logout();
     if (!mounted) return;
-    Navigator.pushNamedAndRemoveUntil(context, LoginView.routeName, (_) => false);
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      LoginView.routeName,
+      (_) => false,
+    );
   }
 
   Future<void> _openEditProfile() async {
@@ -119,6 +151,8 @@ class _ProfileViewState extends State<ProfileView> {
           else
             _buildBioPanel(profile, textTheme),
           const SizedBox(height: 24),
+          _buildUserPostsGrid(textTheme),
+          const SizedBox(height: 24),
           FilledButton.icon(
             onPressed: _logout,
             icon: const Icon(Icons.logout),
@@ -129,7 +163,12 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  Widget _buildHeader(ProfileModel profile, TextTheme textTheme, Color primary, Color accent) {
+  Widget _buildHeader(
+    ProfileModel profile,
+    TextTheme textTheme,
+    Color primary,
+    Color accent,
+  ) {
     final avatarImage = _resolveAvatarImage(profile);
     return GlassPanel(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
@@ -153,12 +192,16 @@ class _ProfileViewState extends State<ProfileView> {
                   children: [
                     Text(
                       profile.name,
-                      style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                      style: textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       '@${profile.username}',
-                      style: textTheme.bodySmall?.copyWith(color: Colors.white70),
+                      style: textTheme.bodySmall?.copyWith(
+                        color: Colors.white70,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -180,7 +223,11 @@ class _ProfileViewState extends State<ProfileView> {
           const SizedBox(height: 12),
           Align(
             alignment: Alignment.centerRight,
-            child: _GpuBadge(primary: primary, accent: accent, textTheme: textTheme),
+            child: _GpuBadge(
+              primary: primary,
+              accent: accent,
+              textTheme: textTheme,
+            ),
           ),
         ],
       ),
@@ -286,7 +333,10 @@ class _ProfileViewState extends State<ProfileView> {
             children: [
               const Icon(Icons.person_off_outlined, size: 48),
               const SizedBox(height: 16),
-              Text('Aún no hay un perfil vinculado', style: textTheme.titleMedium),
+              Text(
+                'Aún no hay un perfil vinculado',
+                style: textTheme.titleMedium,
+              ),
               const SizedBox(height: 8),
               Text(
                 'Inicia sesión nuevamente para sincronizar tu perfil del backend.',
@@ -306,6 +356,56 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
+  Widget _buildUserPostsGrid(TextTheme textTheme) {
+    if (_postsLoading) {
+      return const Center(child: CircularProgressIndicator.adaptive());
+    }
+
+    if (_userPosts.isEmpty) {
+      return GlassPanel(
+        padding: const EdgeInsets.all(24),
+        child: Center(
+          child: Column(
+            children: [
+              const Icon(
+                Icons.photo_library_outlined,
+                size: 48,
+                color: Colors.white54,
+              ),
+              const SizedBox(height: 12),
+              Text('Aún no tienes publicaciones', style: textTheme.bodyLarge),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return GridView.builder(
+      physics: const NeverScrollableScrollPhysics(),
+      shrinkWrap: true,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 4,
+        mainAxisSpacing: 4,
+        childAspectRatio: 1,
+      ),
+      itemCount: _userPosts.length,
+      itemBuilder: (context, index) {
+        final post = _userPosts[index];
+        return GestureDetector(
+          onTap: () {
+            // TODO: Abrir detalle del post si se desea
+          },
+          child: Image.network(
+            post.imageUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(color: Colors.black12),
+          ),
+        );
+      },
+    );
+  }
+
   String _formatDate(DateTime? date) {
     if (date == null) return 'Sin registro';
     final local = date.toLocal();
@@ -316,7 +416,11 @@ class _ProfileViewState extends State<ProfileView> {
 }
 
 class _ProfileDetailRow extends StatelessWidget {
-  const _ProfileDetailRow({required this.icon, required this.label, required this.value});
+  const _ProfileDetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
   final IconData icon;
   final String label;
@@ -334,9 +438,17 @@ class _ProfileDetailRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: textTheme.bodySmall?.copyWith(color: Colors.white70)),
+              Text(
+                label,
+                style: textTheme.bodySmall?.copyWith(color: Colors.white70),
+              ),
               const SizedBox(height: 2),
-              Text(value, style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
+              Text(
+                value,
+                style: textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),
@@ -346,7 +458,11 @@ class _ProfileDetailRow extends StatelessWidget {
 }
 
 class _GpuBadge extends StatelessWidget {
-  const _GpuBadge({required this.primary, required this.accent, required this.textTheme});
+  const _GpuBadge({
+    required this.primary,
+    required this.accent,
+    required this.textTheme,
+  });
 
   final Color primary;
   final Color accent;
