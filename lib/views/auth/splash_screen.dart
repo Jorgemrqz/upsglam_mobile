@@ -80,14 +80,13 @@ class _SplashScreenState extends State<SplashScreen> {
                     TweenAnimationBuilder<double>(
                       tween: Tween(begin: 0, end: 1),
                       duration: const Duration(milliseconds: 800),
-                      builder: (context, value, child) => Transform.scale(
-                        scale: value,
-                        child: child,
-                      ),
+                      builder: (context, value, child) =>
+                          Transform.scale(scale: value, child: child),
                       child: const CircleAvatar(
                         radius: 60,
-                        backgroundColor: Colors.white24,
-                        child: FlutterLogo(size: 64),
+                        backgroundColor: Colors
+                            .transparent, // Fondo transparente para que se vea bien sobre el fondo degradado
+                        backgroundImage: AssetImage('assets/icon/app_icon.png'),
                       ),
                     ),
                     const SizedBox(height: 28),
@@ -101,12 +100,17 @@ class _SplashScreenState extends State<SplashScreen> {
                     const SizedBox(height: 12),
                     Text(
                       'Creatividad acelerada con GPU + WebFlux',
-                      style: textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: Colors.white70,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 32),
                     GlassPanel(
-                      padding: const EdgeInsets.symmetric(horizontal: 42, vertical: 20),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 42,
+                        vertical: 20,
+                      ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
