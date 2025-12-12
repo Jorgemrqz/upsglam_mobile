@@ -48,12 +48,16 @@ class _LoginViewState extends State<LoginView> {
                   children: [
                     Text(
                       'Bienvenido de vuelta',
-                      style: textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700),
+                      style: textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Inicia sesión para continuar colaborando en UPSGlam 2.0',
-                      style: textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: Colors.white70,
+                      ),
                     ),
                     const SizedBox(height: 32),
                     GlassPanel(
@@ -93,25 +97,20 @@ class _LoginViewState extends State<LoginView> {
                               ),
                               validator: _validatePassword,
                             ),
-                            const SizedBox(height: 12),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton(
-                                onPressed: _isLoading ? null : () {},
-                                child: const Text('Olvidé mi contraseña'),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 24),
                             FilledButton(
                               onPressed: _isLoading ? null : _handleSubmit,
                               child: _isLoading
                                   ? Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: const [
                                         SizedBox(
                                           width: 18,
                                           height: 18,
-                                          child: CircularProgressIndicator(strokeWidth: 2.4),
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.4,
+                                          ),
                                         ),
                                         SizedBox(width: 12),
                                         Text('Conectando...'),
@@ -125,21 +124,26 @@ class _LoginViewState extends State<LoginView> {
                     ),
                     const SizedBox(height: 32),
                     GlassPanel(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 18,
+                      ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
                             '¿Nuevo en UPSGlam?',
-                            style: textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: Colors.white70,
+                            ),
                           ),
                           TextButton(
                             onPressed: _isLoading
                                 ? null
                                 : () => Navigator.pushNamed(
-                                      context,
-                                      RegisterView.routeName,
-                                    ),
+                                    context,
+                                    RegisterView.routeName,
+                                  ),
                             child: const Text('Crear cuenta'),
                           ),
                         ],
