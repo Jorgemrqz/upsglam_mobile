@@ -43,6 +43,7 @@ class _PublishPostViewState extends State<PublishPostView> {
     try {
       final post = await _postService.createPost(
         imageUrl: args.processedImageUrl,
+        originalImageUrl: args.originalImageUrl,
         content: _contentController.text,
         filter: args.selectedFilter,
         mask: args.maskValue,

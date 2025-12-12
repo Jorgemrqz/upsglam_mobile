@@ -4,6 +4,7 @@ class PostModel {
   const PostModel({
     required this.id,
     required this.imageUrl,
+    this.originalImageUrl,
     required this.authorName,
     this.content,
     this.authorUsername,
@@ -20,6 +21,7 @@ class PostModel {
 
   final String id;
   final String imageUrl;
+  final String? originalImageUrl;
   final String authorName;
   final String? content;
   final String? authorUsername;
@@ -41,13 +43,17 @@ class PostModel {
     String? rawContent = (json['content'] as String?)?.trim();
     String? matchedFilter = (json['filter'] as String?)?.trim();
     String? matchedMask = (json['mask'] as String?)?.trim();
+    String? matchedOriginal = (json['originalImageUrl'] as String?)?.trim();
 
     if (rawContent != null) {
-      final metaRegex = RegExp(r'<METADATA:v1\|filter=([^|]*)\|mask=([^|>]*)>');
+      final metaRegex = RegExp(
+        r'<METADATA:v1\|filter=([^|]*)\|mask=([^|]*)(?:\|original=([^|>]*))?>',
+      );
       final match = metaRegex.firstMatch(rawContent);
       if (match != null) {
         matchedFilter = match.group(1);
         matchedMask = match.group(2);
+        matchedOriginal = match.group(3) ?? matchedOriginal;
         // Limpiamos el contenido visible
         rawContent = rawContent.replaceAll(match.group(0)!, '').trim();
       }
@@ -62,6 +68,7 @@ class PostModel {
         }
         return 'https://via.placeholder.com/600x400?text=UPSGlam';
       }(),
+      originalImageUrl: matchedOriginal,
       content: rawContent?.isEmpty == true ? null : rawContent,
       authorName: (json['authorName'] as String?)?.trim() ?? 'Usuario UPSGlam',
       authorUsername: (json['authorUsername'] as String?)?.trim(),
@@ -94,6 +101,7 @@ class PostModel {
   PostModel copyWith({
     String? id,
     String? imageUrl,
+    String? originalImageUrl,
     String? authorName,
     String? content,
     String? authorUsername,
@@ -110,6 +118,7 @@ class PostModel {
     return PostModel(
       id: id ?? this.id,
       imageUrl: imageUrl ?? this.imageUrl,
+      originalImageUrl: originalImageUrl ?? this.originalImageUrl,
       authorName: authorName ?? this.authorName,
       content: content ?? this.content,
       authorUsername: authorUsername ?? this.authorUsername,

@@ -89,6 +89,7 @@ class PostService {
 
   Future<PostModel> createPost({
     required String imageUrl,
+    String? originalImageUrl,
     String? content,
     String? filter,
     int? mask,
@@ -103,9 +104,9 @@ class PostService {
 
     // Inyectamos la metadata en el contenido si existe
     var finalContent = content?.trim() ?? '';
-    if (filter != null || mask != null) {
+    if (filter != null || mask != null || originalImageUrl != null) {
       final metaString =
-          '\n\n<METADATA:v1|filter=${filter ?? ''}|mask=${mask ?? ''}>';
+          '\n\n<METADATA:v1|filter=${filter ?? ''}|mask=${mask ?? ''}|original=${originalImageUrl ?? ''}>';
       finalContent += metaString;
     }
 

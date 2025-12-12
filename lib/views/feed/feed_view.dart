@@ -547,7 +547,7 @@ class _FeedViewState extends State<FeedView> {
   }
 }
 
-class _PostCard extends StatelessWidget {
+class _PostCard extends StatefulWidget {
   const _PostCard({
     required this.post,
     required this.liked,
@@ -570,6 +570,13 @@ class _PostCard extends StatelessWidget {
   final VoidCallback? onEditPost;
   final VoidCallback? onDeletePost;
 
+  @override
+  State<_PostCard> createState() => _PostCardState();
+}
+
+class _PostCardState extends State<_PostCard> {
+  bool _showOriginal = false;
+
   String _formatTimeAgo(DateTime? date) {
     if (date == null) return 'recién';
     final diff = DateTime.now().difference(date);
@@ -579,9 +586,17 @@ class _PostCard extends StatelessWidget {
     return 'hace ${diff.inDays} d';
   }
 
+  void _toggleImage() {
+    if (widget.post.originalImageUrl != null) {
+      setState(() => _showOriginal = !_showOriginal);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final post = widget.post;
+
     final chips = <Widget>[];
     if (post.filter != null) {
       chips.add(Chip(label: Text(post.filter!)));
@@ -647,7 +662,7 @@ class _PostCard extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              if (canManage && managing)
+              if (widget.canManage && widget.managing)
                 const SizedBox(
                   width: 32,
                   height: 32,
@@ -656,14 +671,14 @@ class _PostCard extends StatelessWidget {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                 )
-              else if (canManage)
+              else if (widget.canManage)
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert),
                   onSelected: (value) {
                     if (value == 'edit') {
-                      onEditPost?.call();
+                      widget.onEditPost?.call();
                     } else if (value == 'delete') {
-                      onDeletePost?.call();
+                      widget.onDeletePost?.call();
                     }
                   },
                   itemBuilder: (context) => [
@@ -690,29 +705,76 @@ class _PostCard extends StatelessWidget {
             child: SizedBox(
               height: 400,
               width: double.infinity,
-              child: Image.network(
-                post.imageUrl,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
-                    height: 400,
-                    width: double.infinity,
-                    color: Colors.black12,
-                    child: const Center(child: CircularProgressIndicator()),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) => Container(
-                  height: 400,
-                  width: double.infinity,
-                  color: Colors.black26,
-                  child: const Center(
-                    child: Icon(
-                      Icons.broken_image_outlined,
-                      size: 48,
-                      color: Colors.white38,
+              child: GestureDetector(
+                onTap: _toggleImage,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    AnimatedCrossFade(
+                      duration: const Duration(milliseconds: 500),
+                      firstCurve: Curves.easeInOut,
+                      secondCurve: Curves.easeInOut,
+                      crossFadeState: _showOriginal
+                          ? CrossFadeState.showSecond
+                          : CrossFadeState.showFirst,
+                      firstChild: Image.network(
+                        post.imageUrl,
+                        fit: BoxFit.cover,
+                        height: 400,
+                        width: double.infinity,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            height: 400,
+                            width: double.infinity,
+                            color: Colors.black12,
+                            child: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          height: 400,
+                          width: double.infinity,
+                          color: Colors.black26,
+                          child: const Center(
+                            child: Icon(
+                              Icons.broken_image_outlined,
+                              size: 48,
+                              color: Colors.white38,
+                            ),
+                          ),
+                        ),
+                      ),
+                      secondChild: post.originalImageUrl != null
+                          ? Image.network(
+                              post.originalImageUrl!,
+                              fit: BoxFit.cover,
+                              height: 400,
+                              width: double.infinity,
+                            )
+                          : Container(color: Colors.black),
                     ),
-                  ),
+                    if (post.originalImageUrl != null && _showOriginal)
+                      Positioned(
+                        bottom: 12,
+                        right: 12,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black54,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'Original',
+                            style: TextStyle(color: Colors.white, fontSize: 12),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -722,18 +784,18 @@ class _PostCard extends StatelessWidget {
           Row(
             children: [
               IconButton(
-                icon: liking
+                icon: widget.liking
                     ? const SizedBox(
                         width: 24,
                         height: 24,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : Icon(
-                        liked ? Icons.favorite : Icons.favorite_border,
-                        color: liked ? Colors.pinkAccent : null,
+                        widget.liked ? Icons.favorite : Icons.favorite_border,
+                        color: widget.liked ? Colors.pinkAccent : null,
                         size: 28,
                       ),
-                onPressed: liking ? null : onToggleLike,
+                onPressed: widget.liking ? null : widget.onToggleLike,
               ),
               Text(
                 '${post.likes}',
@@ -744,7 +806,7 @@ class _PostCard extends StatelessWidget {
               const SizedBox(width: 8),
               IconButton(
                 icon: const Icon(Icons.chat_bubble_outline, size: 26),
-                onPressed: onOpenComments,
+                onPressed: widget.onOpenComments,
               ),
               Text(
                 '${post.comments}',
@@ -788,7 +850,7 @@ class _PostCard extends StatelessWidget {
                 if (post.comments > 0) ...[
                   const SizedBox(height: 4),
                   GestureDetector(
-                    onTap: onOpenComments,
+                    onTap: widget.onOpenComments,
                     child: Text(
                       'Ver los ${post.comments} comentarios',
                       style: textTheme.bodySmall?.copyWith(
