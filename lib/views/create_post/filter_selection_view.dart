@@ -217,56 +217,70 @@ class _FilterSelectionViewState extends State<FilterSelectionView> {
                                   ],
                                 ),
                                 const SizedBox(height: 12),
-                                AspectRatio(
-                                  aspectRatio: 4 / 3,
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(22),
-                                    child: Container(
-                                      color: Colors.black,
-                                      alignment: Alignment.center,
-                                      child: Image.memory(
-                                        args.imageBytes,
-                                        fit: BoxFit.contain,
-                                      ),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(22),
+                                  child: Container(
+                                    color: Colors.black,
+                                    alignment: Alignment.center,
+                                    constraints: const BoxConstraints(
+                                      minHeight: 200,
+                                    ),
+                                    child: Image.memory(
+                                      args.imageBytes,
+                                      fit: BoxFit.contain,
                                     ),
                                   ),
                                 ),
                                 const SizedBox(height: 12),
-                                AspectRatio(
-                                  aspectRatio: 4 / 3,
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(22),
-                                    child: _processedUrl == null
-                                        ? Container(
-                                            decoration: BoxDecoration(
-                                              gradient: LinearGradient(
-                                                colors: [
-                                                  primary.withValues(
-                                                    alpha: 0.7,
-                                                  ),
-                                                  accent,
-                                                ],
-                                                begin: Alignment.topLeft,
-                                                end: Alignment.bottomRight,
-                                              ),
-                                            ),
-                                            child: const Center(
-                                              child: Icon(
-                                                Icons.filter,
-                                                color: Colors.white54,
-                                                size: 60,
-                                              ),
-                                            ),
-                                          )
-                                        : Container(
-                                            color: Colors.black,
-                                            alignment: Alignment.center,
-                                            child: Image.network(
-                                              _processedUrl!,
-                                              fit: BoxFit.contain,
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(22),
+                                  child: _processedUrl == null
+                                      ? Container(
+                                          height: 300,
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: [
+                                                primary.withValues(alpha: 0.7),
+                                                accent,
+                                              ],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
                                             ),
                                           ),
-                                  ),
+                                          child: const Center(
+                                            child: Icon(
+                                              Icons.filter,
+                                              color: Colors.white54,
+                                              size: 60,
+                                            ),
+                                          ),
+                                        )
+                                      : Container(
+                                          color: Colors.black,
+                                          alignment: Alignment.center,
+                                          child: Image.network(
+                                            _processedUrl!,
+                                            fit: BoxFit.contain,
+                                            loadingBuilder:
+                                                (
+                                                  context,
+                                                  child,
+                                                  loadingProgress,
+                                                ) {
+                                                  if (loadingProgress == null)
+                                                    return child;
+                                                  return Container(
+                                                    height: 300,
+                                                    width: double.infinity,
+                                                    color: Colors.black12,
+                                                    child: const Center(
+                                                      child:
+                                                          CircularProgressIndicator(),
+                                                    ),
+                                                  );
+                                                },
+                                          ),
+                                        ),
                                 ),
                               ],
                             ),

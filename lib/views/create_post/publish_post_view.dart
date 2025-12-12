@@ -22,7 +22,8 @@ class _PublishPostViewState extends State<PublishPostView> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _arguments ??= ModalRoute.of(context)?.settings.arguments as PublishPostArguments?;
+    _arguments ??=
+        ModalRoute.of(context)?.settings.arguments as PublishPostArguments?;
   }
 
   @override
@@ -58,7 +59,9 @@ class _PublishPostViewState extends State<PublishPostView> {
   }
 
   void _showSnack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -82,7 +85,10 @@ class _PublishPostViewState extends State<PublishPostView> {
                     children: [
                       const Icon(Icons.broken_image_outlined, size: 48),
                       const SizedBox(height: 12),
-                      Text('Aplica un filtro antes de publicar', style: textTheme.titleMedium),
+                      Text(
+                        'Aplica un filtro antes de publicar',
+                        style: textTheme.titleMedium,
+                      ),
                     ],
                   ),
                 ),
@@ -92,7 +98,9 @@ class _PublishPostViewState extends State<PublishPostView> {
                   return SingleChildScrollView(
                     padding: const EdgeInsets.only(bottom: 24),
                     child: ConstrainedBox(
-                      constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -103,27 +111,38 @@ class _PublishPostViewState extends State<PublishPostView> {
                               children: [
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(24),
-                                  child: AspectRatio(
-                                    aspectRatio: 4 / 3,
-                                    child: Image.network(
-                                      args.processedImageUrl,
-                                      fit: BoxFit.cover,
-                                      loadingBuilder: (context, child, loadingProgress) {
-                                        if (loadingProgress == null) return child;
-                                        return Container(
-                                          color: Colors.black12,
-                                          child:
-                                              const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                                        );
-                                      },
-                                      errorBuilder: (context, error, stackTrace) => Container(
-                                        color: Colors.black26,
-                                        child: const Center(
-                                          child: Icon(Icons.broken_image_outlined,
-                                              size: 48, color: Colors.white38),
-                                        ),
-                                      ),
-                                    ),
+                                  child: Image.network(
+                                    args.processedImageUrl,
+                                    fit: BoxFit.cover,
+                                    loadingBuilder:
+                                        (context, child, loadingProgress) {
+                                          if (loadingProgress == null)
+                                            return child;
+                                          return Container(
+                                            height: 300,
+                                            width: double.infinity,
+                                            color: Colors.black12,
+                                            child: const Center(
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            Container(
+                                              height: 300,
+                                              width: double.infinity,
+                                              color: Colors.black26,
+                                              child: const Center(
+                                                child: Icon(
+                                                  Icons.broken_image_outlined,
+                                                  size: 48,
+                                                  color: Colors.white38,
+                                                ),
+                                              ),
+                                            ),
                                   ),
                                 ),
                                 const SizedBox(height: 16),
@@ -133,7 +152,9 @@ class _PublishPostViewState extends State<PublishPostView> {
                                     if (args.selectedFilter != null)
                                       Chip(label: Text(args.selectedFilter!)),
                                     if (args.maskValue != null)
-                                      Chip(label: Text('Kernel ${args.maskValue}')),
+                                      Chip(
+                                        label: Text('Kernel ${args.maskValue}'),
+                                      ),
                                     Chip(label: Text(args.fileName)),
                                   ],
                                 ),
@@ -150,7 +171,8 @@ class _PublishPostViewState extends State<PublishPostView> {
                                   maxLines: 3,
                                   decoration: const InputDecoration(
                                     labelText: 'Descripción inspiradora',
-                                    hintText: 'Cuenta cómo aceleraste este efecto en CUDA...',
+                                    hintText:
+                                        'Cuenta cómo aceleraste este efecto en CUDA...',
                                   ),
                                 ),
                                 const SizedBox(height: 18),
@@ -161,7 +183,9 @@ class _PublishPostViewState extends State<PublishPostView> {
                                     Expanded(
                                       child: Text(
                                         'Se enviará al microservicio de posts con autenticación JWT.',
-                                        style: textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                                        style: textTheme.bodyMedium?.copyWith(
+                                          color: Colors.white70,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -180,10 +204,16 @@ class _PublishPostViewState extends State<PublishPostView> {
                                     ? const SizedBox(
                                         width: 18,
                                         height: 18,
-                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
                                       )
                                     : const Icon(Icons.rocket_launch_outlined),
-                                label: Text(_publishing ? 'Publicando...' : 'Publicar en UPSGlam'),
+                                label: Text(
+                                  _publishing
+                                      ? 'Publicando...'
+                                      : 'Publicar en UPSGlam',
+                                ),
                               ),
                             ),
                           ),
