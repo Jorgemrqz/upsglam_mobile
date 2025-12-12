@@ -83,27 +83,22 @@ class _SplashScreenState extends State<SplashScreen> {
                       builder: (context, value, child) =>
                           Transform.scale(scale: value, child: child),
                       child: const CircleAvatar(
-                        radius: 60,
+                        radius: 120, // Logo mucho más grande
                         backgroundColor: Colors
                             .transparent, // Fondo transparente para que se vea bien sobre el fondo degradado
                         backgroundImage: AssetImage('assets/icon/app_icon.png'),
                       ),
                     ),
-                    const SizedBox(height: 28),
-                    Text(
-                      'UPSGlam 2.0',
-                      style: textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.2,
+                    // Texto 'UPSGlam 2.0' eliminado
+                    Transform.translate(
+                      offset: const Offset(0, -40),
+                      child: Text(
+                        'Creatividad acelerada con GPU + WebFlux',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: Colors.white70,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Creatividad acelerada con GPU + WebFlux',
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: Colors.white70,
-                      ),
-                      textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 32),
                     GlassPanel(
