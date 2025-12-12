@@ -601,27 +601,50 @@ class _PostCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              CircleAvatar(
-                backgroundImage: post.authorAvatar != null
-                    ? NetworkImage(post.authorAvatar!)
-                    : null,
-                child: post.authorAvatar == null ? Text(initials) : null,
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    post.authorName,
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
+              GestureDetector(
+                onTap: () {
+                  if (post.userId != null) {
+                    final profile = ProfileModel(
+                      id: post.userId!,
+                      name: post.authorName,
+                      username: post.authorUsername ?? 'usuario',
+                      avatarUrl: post.authorAvatar,
+                    );
+                    Navigator.pushNamed(
+                      context,
+                      ProfileView.routeName,
+                      arguments: profile,
+                    );
+                  }
+                },
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundImage: post.authorAvatar != null
+                          ? NetworkImage(post.authorAvatar!)
+                          : null,
+                      child: post.authorAvatar == null ? Text(initials) : null,
                     ),
-                  ),
-                  Text(
-                    '${_formatTimeAgo(post.createdAt)} · GPU Filter',
-                    style: textTheme.bodySmall?.copyWith(color: Colors.white60),
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          post.authorName,
+                          style: textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          '${_formatTimeAgo(post.createdAt)} · GPU Filter',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: Colors.white60,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
               const Spacer(),
               if (canManage && managing)
