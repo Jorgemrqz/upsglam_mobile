@@ -7,6 +7,7 @@ import 'package:upsglam_mobile/services/auth_service.dart';
 import 'package:upsglam_mobile/services/post_service.dart';
 import 'package:upsglam_mobile/theme/upsglam_theme.dart';
 import 'package:upsglam_mobile/views/auth/login_view.dart';
+import 'package:upsglam_mobile/views/feed/post_detail_view.dart';
 import 'package:upsglam_mobile/views/profile/edit_profile_view.dart';
 import 'package:upsglam_mobile/widgets/glass_panel.dart';
 import 'package:upsglam_mobile/widgets/upsglam_background.dart';
@@ -394,7 +395,16 @@ class _ProfileViewState extends State<ProfileView> {
         final post = _userPosts[index];
         return GestureDetector(
           onTap: () {
-            // TODO: Abrir detalle del post si se desea
+            Navigator.pushNamed(
+              context,
+              PostDetailView.routeName,
+              arguments: post,
+            ).then((deleted) {
+              if (deleted == true) {
+                // Si el post fue eliminado, recargamos la lista
+                if (_profile != null) _loadUserPosts(_profile!.id);
+              }
+            });
           },
           child: Image.network(
             post.imageUrl,

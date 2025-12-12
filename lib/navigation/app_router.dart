@@ -8,6 +8,7 @@ import 'package:upsglam_mobile/views/create_post/publish_post_view.dart';
 import 'package:upsglam_mobile/views/create_post/select_image_view.dart';
 import 'package:upsglam_mobile/views/feed/comments_view.dart';
 import 'package:upsglam_mobile/views/feed/feed_view.dart';
+import 'package:upsglam_mobile/views/feed/post_detail_view.dart';
 import 'package:upsglam_mobile/views/profile/edit_profile_view.dart';
 import 'package:upsglam_mobile/views/profile/profile_view.dart';
 import 'package:upsglam_mobile/views/settings/settings_view.dart';
@@ -43,11 +44,15 @@ class AppRouter {
         return _material(const SettingsView());
       case GatewaySetupView.routeName:
         return _material(const GatewaySetupView());
+      case PostDetailView.routeName:
+        return _material(const PostDetailView(), settings);
       default:
         return _material(const SplashScreen());
     }
   }
 
-  static MaterialPageRoute<dynamic> _material(Widget child, [RouteSettings? settings]) =>
-      MaterialPageRoute<dynamic>(builder: (_) => child, settings: settings);
+  static MaterialPageRoute<dynamic> _material(
+    Widget child, [
+    RouteSettings? settings,
+  ]) => MaterialPageRoute<dynamic>(builder: (_) => child, settings: settings);
 }
