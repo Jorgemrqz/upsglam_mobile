@@ -11,13 +11,21 @@ class FilterSelectionView extends StatefulWidget {
   const FilterSelectionView({super.key});
 
   static const routeName = '/filter-selection';
-  static const filters = <String>['Sobel', 'Gaussian', 'Emboss', 'Mean', 'UPS'];
+  static const filters = <String>[
+    'Sobel',
+    'Gaussian',
+    'Emboss',
+    'Mean',
+    'UPS',
+    'Oil Paint',
+  ];
   static const Map<String, List<int>> filterKernelPresets = {
     'Sobel': [3, 9, 15],
     'Gaussian': [31, 71, 141],
     'Emboss': [9, 21, 65],
     'Mean': [3, 5, 7],
     'UPS': [3, 5, 7],
+    'Oil Paint': [3, 5, 7],
   };
 
   @override
@@ -28,7 +36,9 @@ class _FilterSelectionViewState extends State<FilterSelectionView> {
   final AuthService _authService = AuthService.instance;
   FilterSelectionArguments? _arguments;
   String _selectedFilter = FilterSelectionView.filters.first;
-  int _maskValue = FilterSelectionView.filterKernelPresets[FilterSelectionView.filters.first]!.first;
+  int _maskValue = FilterSelectionView
+      .filterKernelPresets[FilterSelectionView.filters.first]!
+      .first;
   bool _processing = false;
   String? _processedUrl;
   String? _originalUrl;
@@ -46,7 +56,8 @@ class _FilterSelectionViewState extends State<FilterSelectionView> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _arguments ??= ModalRoute.of(context)?.settings.arguments as FilterSelectionArguments?;
+    _arguments ??=
+        ModalRoute.of(context)?.settings.arguments as FilterSelectionArguments?;
   }
 
   @override
@@ -55,7 +66,8 @@ class _FilterSelectionViewState extends State<FilterSelectionView> {
     super.dispose();
   }
 
-  String get _normalizedFilter => _selectedFilter.toLowerCase();
+  String get _normalizedFilter =>
+      _selectedFilter.toLowerCase().replaceAll(' ', '_');
 
   List<int> get _currentKernelPresets =>
       FilterSelectionView.filterKernelPresets[_selectedFilter] ?? const [3];
@@ -135,7 +147,9 @@ class _FilterSelectionViewState extends State<FilterSelectionView> {
   }
 
   void _showSnack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -162,7 +176,10 @@ class _FilterSelectionViewState extends State<FilterSelectionView> {
                     children: [
                       const Icon(Icons.broken_image_outlined, size: 48),
                       const SizedBox(height: 12),
-                      Text('Selecciona una imagen primero', style: textTheme.titleMedium),
+                      Text(
+                        'Selecciona una imagen primero',
+                        style: textTheme.titleMedium,
+                      ),
                     ],
                   ),
                 ),
@@ -170,9 +187,13 @@ class _FilterSelectionViewState extends State<FilterSelectionView> {
             : LayoutBuilder(
                 builder: (context, constraints) {
                   return SingleChildScrollView(
-                    padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 24),
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.of(context).padding.bottom + 24,
+                    ),
                     child: ConstrainedBox(
-                      constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -183,11 +204,15 @@ class _FilterSelectionViewState extends State<FilterSelectionView> {
                               children: [
                                 Row(
                                   children: [
-                                    const Icon(Icons.auto_awesome_motion_outlined),
+                                    const Icon(
+                                      Icons.auto_awesome_motion_outlined,
+                                    ),
                                     const SizedBox(width: 8),
                                     Text(
                                       'Vista previa en GPU',
-                                      style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                                      style: textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -215,13 +240,22 @@ class _FilterSelectionViewState extends State<FilterSelectionView> {
                                         ? Container(
                                             decoration: BoxDecoration(
                                               gradient: LinearGradient(
-                                                colors: [primary.withValues(alpha: 0.7), accent],
+                                                colors: [
+                                                  primary.withValues(
+                                                    alpha: 0.7,
+                                                  ),
+                                                  accent,
+                                                ],
                                                 begin: Alignment.topLeft,
                                                 end: Alignment.bottomRight,
                                               ),
                                             ),
                                             child: const Center(
-                                              child: Icon(Icons.filter, color: Colors.white54, size: 60),
+                                              child: Icon(
+                                                Icons.filter,
+                                                color: Colors.white54,
+                                                size: 60,
+                                              ),
                                             ),
                                           )
                                         : Container(
@@ -243,12 +277,17 @@ class _FilterSelectionViewState extends State<FilterSelectionView> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Selecciona un filtro', style: textTheme.titleMedium),
+                                Text(
+                                  'Selecciona un filtro',
+                                  style: textTheme.titleMedium,
+                                ),
                                 const SizedBox(height: 12),
                                 Wrap(
                                   spacing: 10,
                                   runSpacing: 8,
-                                  children: FilterSelectionView.filters.map((filter) {
+                                  children: FilterSelectionView.filters.map((
+                                    filter,
+                                  ) {
                                     final selected = filter == _selectedFilter;
                                     return ChoiceChip(
                                       label: Text(filter),
@@ -257,13 +296,15 @@ class _FilterSelectionViewState extends State<FilterSelectionView> {
                                         if (!selected) {
                                           setState(() {
                                             _selectedFilter = filter;
-                                            final defaults =
-                                                FilterSelectionView.filterKernelPresets[filter];
-                                            final newKernel = (defaults?.first ?? 3).isOdd
+                                            final defaults = FilterSelectionView
+                                                .filterKernelPresets[filter];
+                                            final newKernel =
+                                                (defaults?.first ?? 3).isOdd
                                                 ? defaults?.first ?? 3
                                                 : 3;
                                             _maskValue = newKernel;
-                                            _kernelController.text = newKernel.toString();
+                                            _kernelController.text = newKernel
+                                                .toString();
                                           });
                                         }
                                       },
@@ -271,14 +312,20 @@ class _FilterSelectionViewState extends State<FilterSelectionView> {
                                   }).toList(),
                                 ),
                                 const SizedBox(height: 18),
-                                Text('Kernel (impar ≥ 3)', style: textTheme.titleMedium),
+                                Text(
+                                  'Kernel (impar ≥ 3)',
+                                  style: textTheme.titleMedium,
+                                ),
                                 const SizedBox(height: 8),
                                 TextField(
                                   controller: _kernelController,
                                   keyboardType: TextInputType.number,
                                   decoration: InputDecoration(
-                                    prefixIcon: const Icon(Icons.memory_outlined),
-                                    hintText: 'Ingresa un kernel impar (ej. 31)',
+                                    prefixIcon: const Icon(
+                                      Icons.memory_outlined,
+                                    ),
+                                    hintText:
+                                        'Ingresa un kernel impar (ej. 31)',
                                     helperText: _selectedFilter == 'UPS'
                                         ? 'UPS valida el kernel pero usa valores fijos.'
                                         : 'Recomendado: ${_currentKernelPresets.join(', ')}',
@@ -297,30 +344,48 @@ class _FilterSelectionViewState extends State<FilterSelectionView> {
                                             onPressed: () {
                                               setState(() {
                                                 _maskValue = value;
-                                                _kernelController.text = value.toString();
+                                                _kernelController.text = value
+                                                    .toString();
                                               });
                                             },
                                           ),
                                         )
                                         .toList(),
                                   ),
-                                if (_currentKernelPresets.isNotEmpty) const SizedBox(height: 12),
+                                if (_currentKernelPresets.isNotEmpty)
+                                  const SizedBox(height: 12),
                                 FilledButton.icon(
-                                  onPressed: _processing ? null : _handleProcess,
+                                  onPressed: _processing
+                                      ? null
+                                      : _handleProcess,
                                   icon: _processing
                                       ? const SizedBox(
                                           width: 18,
                                           height: 18,
-                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
                                         )
-                                      : const Icon(Icons.auto_fix_high_outlined),
-                                  label: Text(_processing ? 'Procesando...' : 'Aplicar filtro en GPU'),
+                                      : const Icon(
+                                          Icons.auto_fix_high_outlined,
+                                        ),
+                                  label: Text(
+                                    _processing
+                                        ? 'Procesando...'
+                                        : 'Aplicar filtro en GPU',
+                                  ),
                                 ),
                                 if (_processedUrl != null) ...[
                                   const SizedBox(height: 12),
-                                  SelectableText('Procesada: $_processedUrl', style: textTheme.bodySmall),
+                                  SelectableText(
+                                    'Procesada: $_processedUrl',
+                                    style: textTheme.bodySmall,
+                                  ),
                                   if (_originalUrl != null)
-                                    SelectableText('Original: $_originalUrl', style: textTheme.bodySmall),
+                                    SelectableText(
+                                      'Original: $_originalUrl',
+                                      style: textTheme.bodySmall,
+                                    ),
                                 ],
                               ],
                             ),
@@ -329,7 +394,9 @@ class _FilterSelectionViewState extends State<FilterSelectionView> {
                           SafeArea(
                             top: false,
                             child: FilledButton.icon(
-                              onPressed: _processedUrl == null ? null : _goToPublish,
+                              onPressed: _processedUrl == null
+                                  ? null
+                                  : _goToPublish,
                               icon: const Icon(Icons.check_circle),
                               label: const Text('Continuar con este filtro'),
                             ),
