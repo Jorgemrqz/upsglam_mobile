@@ -118,8 +118,9 @@ class _PublishPostViewState extends State<PublishPostView> {
                                     fit: BoxFit.cover,
                                     loadingBuilder:
                                         (context, child, loadingProgress) {
-                                          if (loadingProgress == null)
+                                          if (loadingProgress == null) {
                                             return child;
+                                          }
                                           return Container(
                                             height: 300,
                                             width: double.infinity,

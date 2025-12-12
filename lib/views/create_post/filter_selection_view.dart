@@ -267,8 +267,9 @@ class _FilterSelectionViewState extends State<FilterSelectionView> {
                                                   child,
                                                   loadingProgress,
                                                 ) {
-                                                  if (loadingProgress == null)
+                                                  if (loadingProgress == null) {
                                                     return child;
+                                                  }
                                                   return Container(
                                                     height: 300,
                                                     width: double.infinity,
