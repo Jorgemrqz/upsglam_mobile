@@ -9,6 +9,7 @@ import 'package:upsglam_mobile/theme/upsglam_theme.dart';
 import 'package:upsglam_mobile/views/auth/login_view.dart';
 import 'package:upsglam_mobile/views/feed/post_detail_view.dart';
 import 'package:upsglam_mobile/views/profile/edit_profile_view.dart';
+import 'package:upsglam_mobile/views/settings/settings_view.dart';
 import 'package:upsglam_mobile/widgets/glass_panel.dart';
 import 'package:upsglam_mobile/widgets/upsglam_background.dart';
 
@@ -105,12 +106,12 @@ class _ProfileViewState extends State<ProfileView> {
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text('Perfil del laboratorio'),
+        title: const Text('Perfil de usuario'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_outlined),
-            onPressed: _loading ? null : _loadProfile,
-            tooltip: 'Recargar perfil',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () =>
+                Navigator.pushNamed(context, SettingsView.routeName),
           ),
           IconButton(
             icon: const Icon(Icons.edit_outlined),

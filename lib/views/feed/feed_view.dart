@@ -11,7 +11,7 @@ import 'package:upsglam_mobile/services/realtime_post_stream_service.dart';
 import 'package:upsglam_mobile/views/create_post/select_image_view.dart';
 import 'package:upsglam_mobile/views/feed/comments_view.dart';
 import 'package:upsglam_mobile/views/profile/profile_view.dart';
-import 'package:upsglam_mobile/views/settings/settings_view.dart';
+
 import 'package:upsglam_mobile/widgets/glass_panel.dart';
 import 'package:upsglam_mobile/widgets/upsglam_background.dart';
 
@@ -429,36 +429,39 @@ class _FeedViewState extends State<FeedView> {
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: Padding(
-          padding: const EdgeInsets.only(left: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'UPSGlam',
-                style: textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.add_a_photo_outlined),
+          tooltip: 'Crear post',
+          onPressed: _handleCreatePost,
+        ),
+        title: Column(
+          children: [
+            Text(
+              'UPSGlam',
+              style: textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.2,
+                fontSize: 26, // Aumentado para resaltar más
               ),
-              Text(
-                'GPU Filters · Firestore en vivo',
-                style: textTheme.bodySmall?.copyWith(color: Colors.white70),
+            ),
+            Text(
+              'GPU Filters',
+              style: textTheme.bodySmall?.copyWith(
+                color: Colors.white70,
+                fontSize: 10,
+                letterSpacing: 1.5,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () =>
-                Navigator.pushNamed(context, SettingsView.routeName),
-          ),
           IconButton(
             icon: const Icon(Icons.person_outline),
             onPressed: () =>
                 Navigator.pushNamed(context, ProfileView.routeName),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
         ],
       ),
       body: UPSGlamBackground(
@@ -533,11 +536,6 @@ class _FeedViewState extends State<FeedView> {
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _handleCreatePost,
-        icon: const Icon(Icons.add_a_photo),
-        label: const Text('Crear post'),
       ),
     );
   }
